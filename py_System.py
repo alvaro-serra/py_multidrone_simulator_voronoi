@@ -1,10 +1,11 @@
 import numpy as np
 import numpy.matlib as matlib
+import time
 
 from modules.pyCSystem import pyCSystem
 from scenarios.scenarios import scn_circle
 
-import time
+import ray
 
 
 # Problem setup for basic mav collision avoidance
@@ -88,41 +89,37 @@ def basic_setup(nQuad, nDynObs):
 
     return pr, model, index
 
-
-
-
-if __name__ == '__main__':
+def createMultiDroneSystem(nQuad = 12, nDynObs = 0):
     ## Initialization
-    nQuad = 12
-    nDynObs = 0
-    srv_idx = 1  # Not necessary
+    nQuad = nQuad
+    nDynObs = nDynObs
 
-    #>>> initialize_func >>>>
+    # >>> initialize_func >>>>
     application = "basic"
-    #getNewSolver = 0 # NOT NECESSARY IF GENERATED FROM MATLAB
+    # getNewSolver = 0 # NOT NECESSARY IF GENERATED FROM MATLAB
     quadExpID = list(range(100))
 
     # Load problem setup
-    #if application == "basic": # It is always basic for the moment
+    # if application == "basic": # It is always basic for the moment
     pr, model, index = basic_setup(nQuad, nDynObs)
 
     quadStartPos, quadStartVel, quadEndPos = scn_circle(model["nQuad"], 4.0)
 
     cfg = {
-        #running mode
+        # running mode
         "quadStartPos": quadStartPos,
         "quadStartVel": quadStartVel,
-        "quadEndPos":   quadEndPos,
-        "application":  "basic",
-        "modeSim":  1,
+        "quadEndPos": quadEndPos,
+        "application": "basic",
+        "modeSim": 1,
         "modeCoor": 2,
 
         # environment boundary, [xmax, ymax, zmax]
-        "ws":   np.array([[6.0, 6.0, 3.0]]).T, # m
+        "ws": np.array([[6.0, 6.0, 3.0]]).T,  # m
 
-        "quad":{
+        "quad": {
             # goal
-            "goal": quadEndPos, #[quadEndPos],
+            "goal": quadEndPos,  # [quadEndPos],
 
             # drone size, collision avoidance parameters
             "size": np.array([[0.3, 0.3, 0.5]]).T,
@@ -141,16 +138,16 @@ if __name__ == '__main__':
 
     # terminal weights
     wN = {
-        "wp":   10,
-        "input":    0.0,
+        "wp": 10,
+        "input": 0.0,
         "coll": 0.2,
-        "slack":    1e4,
+        "slack": 1e4,
     }
     cfg["weightN"] = np.array([[wN["wp"]], [wN["input"]], [wN["coll"]], [wN["slack"]]])
 
     # moving obstacles
     cfg["obs"] = {
-        "size": np.array([[0.5, 0.5, 0.9]]).T,  #[a, b, c]
+        "size": np.array([[0.5, 0.5, 0.9]]).T,  # [a, b, c]
         "coll": np.array([[10, 1.2, 0.03]]).T  # lambda, buffer, delta
     }
 
@@ -165,10 +162,10 @@ if __name__ == '__main__':
     cfg["ifShowQuadPathCov"] = 0
 
     ## Extra running configuration for chance constrained collision avoidance --> NOT NEEDED--> CAN USE MATLAB
-    #<<<initialize_func<<<
+    # <<<initialize_func<<<
 
     # Not necessary for the moment --> can be done through matlab
-    #if getNewSolver:
+    # if getNewSolver:
     #    mpc_generator_basic
 
     # Create multi-robot system
@@ -180,25 +177,51 @@ if __name__ == '__main__':
         # coordination mode
         System.MultiQuad_[iQuad].modeCoor_ = cfg["modeCoor"]
         # initial state
-        System.MultiQuad_[iQuad].pos_real_[0:3] = quadStartPos[0:3, iQuad:iQuad+1]
-        System.MultiQuad_[iQuad].vel_real_[0:3] = quadStartVel[0:3, iQuad:iQuad+1]
-        System.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3,1))
-        System.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, iQuad:iQuad+1]
+        System.MultiQuad_[iQuad].pos_real_[0:3] = quadStartPos[0:3, iQuad:iQuad + 1]
+        System.MultiQuad_[iQuad].vel_real_[0:3] = quadStartVel[0:3, iQuad:iQuad + 1]
+        System.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
+        System.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, iQuad:iQuad + 1]
         # for mpc
-        x_start = np.concatenate([System.MultiQuad_[iQuad].pos_real_, System.MultiQuad_[iQuad].vel_real_, System.MultiQuad_[iQuad].euler_real_], axis = 0)
-        z_start = np.zeros((model["nvar"],1))
+        x_start = np.concatenate([System.MultiQuad_[iQuad].pos_real_, System.MultiQuad_[iQuad].vel_real_,
+                                  System.MultiQuad_[iQuad].euler_real_], axis=0)
+        z_start = np.zeros((model["nvar"], 1))
         z_start[index["z"]["pos"] + index["z"]["vel"] + index["z"]["euler"]] = x_start
-        mpc_plan = matlib.repmat(z_start, 1, model["N"]) #
-        #initialize mpc
-        System.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan) 
+        mpc_plan = matlib.repmat(z_start, 1, model["N"])  #
+        # initialize mpc
+        System.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)
 
         # to avoid whom in prioritized planning --> NOT NECESSARY, CHECK MATLAB IMPLEMENTATION IF WE WANT TO ADAPT
+        #################################### Until here the fundamentally necessary ############################################
+        #################################### ADDITIONAL CONTENT ###############################################################
+        # Quad pathcov initialization --> UNNECESSARY (chance constraints)
+        """
+        for iQuad in range(model["nQuad"]):
+            System.multi_quad_state_[0:3,iQuad] = quadStartPos[0:3, iQuad]
+            for iStage in range(model["N"]):
+                System.multi_quad_mpc_path_[:, iStage, iQuad] = quadStartPos[0:3, iQuad]
+                System.multi_quad_mpc_pathcov_[:, iStage, iQuad] = [cfg["quad"]["noise"]["pos"][]]
+        """
 
-#################################### Until here the fundamentally necessary############################################
-    # TODO: write testing code --> create a system initializator # DO THIS AS FIRST THING IN THE MORNING - FIRST CHECK WHAT KIND OF MESSAGE IS PASSED AS ACTION
+        # Set moving obstacle objects in simulation mode --> UNNECESSARY (no moving obstacles other than drones)
+
+        # TODO:Initialization graphic communicator
+        # initialize ROS
+        # set default quad and obs size
+
+        # Create the server --> UNNECESSARY (this is what we want to avoid)
+
+        return System
+
+
+if __name__ == '__main__':
+
+    nQuad = 12
+    nDynObs = 0
+    System = createMultiDroneSystem(nQuad = nQuad, nDynObs = nDynObs)
+    ray.init(local_mode=False)
     # (i, j) --> robot i requests from robot j its traj. intention
-    #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-    n_action = np.zeros((nQuad,nQuad))
+    n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+    #n_action = np.zeros((nQuad,nQuad))
     n_action[0,0] = -1
     sent_action = n_action.flatten()
 
@@ -207,33 +230,16 @@ if __name__ == '__main__':
         print("step:",i)
         aux1 = time.time()
         System.stepMultiAgent(sent_action)
-        #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-        n_action = np.zeros((nQuad, nQuad))
+        n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+        #n_action = np.zeros((nQuad, nQuad))
+        #n_action[1, 1] = -1
         sent_action = n_action.flatten()
-        print("solving time:", time.time() - aux1)
+        print("step time:", time.time() - aux1)
 
     print("time:", time.time() - aux2)
     print("everything's over")
+    ray.shutdown()
 
-####################
-    # Quad pathcov initialization --> UNNECESSARY (chance constraints)
-    """
-    for iQuad in range(model["nQuad"]):
-        System.multi_quad_state_[0:3,iQuad] = quadStartPos[0:3, iQuad]
-        for iStage in range(model["N"]):
-            System.multi_quad_mpc_path_[:, iStage, iQuad] = quadStartPos[0:3, iQuad]
-            System.multi_quad_mpc_pathcov_[:, iStage, iQuad] = [cfg["quad"]["noise"]["pos"][]]
-    """
-
-    # Set moving obstacle objects in simulation mode --> UNNECESSARY (no moving obstacles other than drones)
-
-    # TODO:Initialization graphic communicator
-    # initialize ROS
-    # set default quad and obs size
-
-    # Create the server --> UNNECESSARY (this is what we want to avoid)
-
-    #
 
 
 

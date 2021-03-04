@@ -61,8 +61,8 @@ def scn_random(nQuad, xDim, yDim, zDim):
 
     # random starting and end pos
     for iQuad in range(nQuad):
-        xN_i = xidx_rand(iQuad)
-        yN_i = yidx_rand(iQuad)
+        xN_i = xidx_rand[iQuad]
+        yN_i = yidx_rand[iQuad]
         zN_i = np.random.randint(zN-1)
 
         quadEndPos[0, iQuad] = xDim[0] + resolution*xN_i

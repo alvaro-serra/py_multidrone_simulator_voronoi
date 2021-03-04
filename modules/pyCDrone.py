@@ -1,14 +1,82 @@
 
+import time
 import numpy as np
 import numpy.matlib as matlib
 import warnings
 warnings.simplefilter("always")
 
-#from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_py import FORCESNLPsolver_basic_11_20_50_solve as solver
-from solvers.solver.basic.Basic_Forces_11_20_50 import FORCESNLPsolver_basic_11_20_50_py
+from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_py import FORCESNLPsolver_basic_11_20_50_solve as solver
+#from solvers.solver.basic.Basic_Forces_11_20_50 import FORCESNLPsolver_basic_11_20_50_py
 from integrators.RK2 import rk2a_onestep as RK2
+import ray
 
+@ray.remote
+def solveMPC_ray(all_parameters, xinit, x0): #Might be some issues with the shape of the vectors
+    # call the NLP solver
+    #aux1 = time.time()
+    problem = {}
+    problem['all_parameters'] = all_parameters.copy()
+    problem['xinit'] = xinit.copy()
+    problem['x0'] = x0.copy()
+    OUTPUT, EXITFLAG, INFO = solver(problem)
+    #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
+    #print("Solving time drone:",time.time()-aux1)
+    return [OUTPUT.copy(), EXITFLAG, INFO]
 
+@ray.remote
+def setOnlineParameters_ray(Quad):
+    # Set the real-time parameter vector
+    # pAll include parameters for all N stage
+
+    # prepare parameters
+    envDim = Quad.cfg_["ws"]
+    startPos = np.concatenate([Quad.pos_est_, [Quad.euler_est_[2]]], 0)
+    wayPoint = Quad.quad_goal_
+    egoSize = Quad.size_
+    weightStage = Quad.mpc_weights_[:,0]
+    weightN = Quad.mpc_weights_[:,1]
+    quadSize = Quad.cfg_["quad"]["size"]
+    obsSize = Quad.cfg_["obs"]["size"]
+    quadColl = Quad.mpc_coll_[0:2,0:1] #lambda, buffer (sigmoid function)
+    obsColl = Quad.mpc_coll_[0:2,1:2] #lambda, buffer
+    quadPath = Quad.quad_path_
+    obsPath = Quad.obs_path_
+
+    # all stage parameters
+    pStage = np.zeros((Quad.npar_, 1))
+    mpc_pAll_ = matlib.repmat(pStage, Quad.N_, 1)
+    for iStage in range(0,Quad.N_):
+        #general parameter
+        pStage[Quad.index_["p"]["envDim"]] = envDim
+        pStage[Quad.index_["p"]["startPos"]] = startPos
+        pStage[Quad.index_["p"]["wayPoint"]] = wayPoint
+        pStage[Quad.index_["p"]["size"]] = egoSize
+        pStage[Quad.index_["p"]["weights"], 0] = weightStage
+        # obstacle information, including other quadrotors
+        # and moving obstacles, set other quad first
+        idx = 0
+        for iQuad in range(Quad.nQuad_):
+            if iQuad == Quad.id_:
+                continue
+            else:
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = quadPath[:, iStage,iQuad:iQuad+1]
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = quadSize
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = quadColl
+                idx = idx + 1
+
+        for jObs in range(Quad.nDynObs_):
+            pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"],idx]] = obsPath[:, iStage, jObs:jObs+1]
+            pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = obsSize
+            pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = obsColl
+            idx = idx + 1
+
+        # change the last stage cost term weights
+        if iStage == Quad.N_-1:
+            pStage[Quad.index_["p"]["weights"], 0] = weightN
+
+        # insert into the all stage parameter
+        mpc_pAll_[Quad.npar_ * iStage : Quad.npar_ * (iStage+1)] = pStage
+    return mpc_pAll_.copy()
 
 
 class pyCDrone():
@@ -184,14 +252,13 @@ class pyCDrone():
         # pAll include parameters for all N stage
         ## prepare parameters
 
-
-    def solveMPC(self): #Might be some issues with the shape of the vectors
+    def solveMPC_original(self): #Might be some issues with the shape of the vectors
         # Calling the solver to solve the mpc for collision avoidance
-        problem ={}
-        problem["all_parameters"] = self.mpc_pAll_
-
         #set initial conditions
         self.mpc_Xk_ = np.concatenate([self.pos_est_, self.vel_est_, self.euler_est_], 0)
+
+        problem = {}
+        problem["all_parameters"] = self.mpc_pAll_
         problem["xinit"] = self.mpc_Xk_
 
         #prepare initial guess
@@ -208,8 +275,10 @@ class pyCDrone():
         #problem["num_of_threads"] = 1
 
         # call the NLP solver
-        #OUTPUT, EXITFLAG, INFO = solver(problem)
-        OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
+        #aux1 = time.time()
+        OUTPUT, EXITFLAG, INFO = solver(problem)
+        #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
+        #print("Solving time drone:",time.time()-aux1)
 
         # store solving information
         self.mpc_exitflag_ = EXITFLAG
@@ -258,6 +327,89 @@ class pyCDrone():
         self.u_body_[0] = self.u_mpc_[1]*np.sin(yaw) + self.u_mpc_[0]*np.cos(yaw) #TODO: clarify with Hai
         self.u_body_[1] = self.u_mpc_[1]*np.cos(yaw) + self.u_mpc_[0]*np.sin(yaw) #u_mpc global --> here transform to local
                                                                             # this is only useful if performing real experiments
+
+    def solveMPC_pre(self): #Might be some issues with the shape of the vectors
+        # Calling the solver to solve the mpc for collision avoidance
+        #set initial conditions
+        self.mpc_Xk_ = np.concatenate([self.pos_est_, self.vel_est_, self.euler_est_], 0)
+        # prepare initial guess
+        # self.mpc_exitflag_ = 0 # for debugging
+        if self.mpc_exitflag_ == 1:  # last step mpc feasible
+            x0_temp = np.reshape(
+                np.concatenate([self.mpc_ZPlan_[:, 1:self.N_], self.mpc_ZPlan_[:, (self.N_ - 1):self.N_]], axis=1).T,
+                (self.N_ * self.nvar_, 1))
+
+        else:  # last step mpc infeasible
+            x0_temp_stage = np.zeros((self.nvar_, 1))
+            x0_temp_stage[self.index_["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = self.mpc_Xk_
+            x0_temp = matlib.repmat(x0_temp_stage, self.N_, 1)
+
+        problem = {}
+        problem["all_parameters"] = self.mpc_pAll_
+        problem["xinit"] = self.mpc_Xk_
+        problem["x0"] = x0_temp
+
+        return problem
+
+
+    def solveMPC(self, problem): #Might be some issues with the shape of the vectors
+        # call the NLP solver
+        #aux1 = time.time()
+        OUTPUT, EXITFLAG, INFO = solver(problem)
+        #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
+        #print("Solving time drone:",time.time()-aux1)
+
+        return [OUTPUT.copy(), EXITFLAG, INFO]
+
+
+    def solveMPC_pos(self, OUTPUT, EXITFLAG, INFO): #Might be some issues with the shape of the vectors
+
+        # store solving information
+        self.mpc_exitflag_ = EXITFLAG
+        self.mpc_info_ = INFO
+
+        # store output
+        for iStage in range(self.N_):
+            self.mpc_ZPlan_[:, iStage] = OUTPUT["x{0:0=2d}".format(iStage + 1)]
+            self.mpc_Path_[:, iStage] = self.mpc_ZPlan_[self.index_["z"]["pos"], iStage]
+            self.mpc_traj_[0, iStage] = self.time_step_global_
+            self.mpc_traj_[1:7, iStage] = self.mpc_ZPlan_[self.index_["z"]["pos"] + self.index_["z"]["vel"], iStage]
+
+        self.mpc_Zk_ = self.mpc_ZPlan_[:, 0:1]
+        self.mpc_Zk2_ = self.mpc_ZPlan_[:, 1:2]
+
+        # check the exitflag and get optimal control input
+        if EXITFLAG == 0:
+            warnings.warn("MPC: Max iterations reached!")
+        elif EXITFLAG == -4:
+            warnings.warn("MPC: Wrong number of inequalities input to solver!")
+        elif EXITFLAG == -5:
+            warnings.warn("MPC: Error occured during matrix factorization!")
+        elif EXITFLAG == -6:
+            warnings.warn("MPC: NaN or INF occured during functions evaluations!")
+        elif EXITFLAG == -7:
+            warnings.warn("MPC: Infeasible! The solver could not proceed!")
+        elif EXITFLAG == -10:
+            warnings.warn("MPC: NaN or INF occured during evaluation of functions and derivatives!")
+        elif EXITFLAG == -11:
+            warnings.warn("MPC: Invalid values in problem parameters!")
+        elif EXITFLAG == -100:
+            warnings.warn("MPC: License error!")
+
+        if EXITFLAG == 1:
+            # if mpc solved successfully
+            self.u_mpc_ = self.mpc_Zk_[self.index_["z"]["inputs"]]
+        else:
+            # if infeasible
+            self.u_mpc_ = -0.0 * self.u_mpc_
+
+        # transform u, check the using dynamics model before doing this!
+        yaw = self.euler_est_[2]
+        self.u_body_ = self.u_mpc_
+        self.u_body_[0] = self.u_mpc_[1] * np.sin(yaw) + self.u_mpc_[0] * np.cos(yaw)  # TODO: clarify with Hai
+        self.u_body_[1] = self.u_mpc_[1] * np.cos(yaw) + self.u_mpc_[0] * np.sin(
+            yaw)  # u_mpc global --> here transform to local
+        # this is only useful if performing real experiments
 
     def step(self):
         # send and execute the control command

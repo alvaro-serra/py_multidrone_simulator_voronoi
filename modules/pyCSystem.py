@@ -2,9 +2,29 @@
 import numpy as np
 import numpy.matlib as matlib
 
-from modules.pyCDrone import pyCDrone
+from modules.pyCDrone import pyCDrone, solveMPC_ray, setOnlineParameters_ray
 from scenarios.scenarios import scn_circle_random, scn_circle, scn_random
 from utils.utils import predictQuadPathFromCom, predictStateConstantV
+import ray
+import time
+
+from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_py import FORCESNLPsolver_basic_11_20_50_solve as solver
+
+
+"""
+def solveMPC(all_parameters, xinit, x0): #Might be some issues with the shape of the vectors
+    # call the NLP solver
+    #aux1 = time.time()
+    problem = {}
+    problem['all_parameters'] = all_parameters
+    problem['xinit'] = xinit
+    problem['x0'] = x0
+    OUTPUT, EXITFLAG, INFO = solver(problem)
+    #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
+    #print("Solving time drone:",time.time()-aux1)
+    return [OUTPUT.copy(), EXITFLAG, INFO]
+"""
+
 
 
 class pyCSystem():
@@ -59,6 +79,7 @@ class pyCSystem():
     # publish dyn obs path in simulation mode
 
     def multiQuadMpcSimStep(self):
+        #aux1 = time.time()
         # sequential mpc control and sim one step for the system
         for iQuad in range(self.nQuad_):
             # get estimated state of the ego quad
@@ -103,18 +124,41 @@ class pyCSystem():
                             self.MultiQuad_[iQuad].quad_path_[2:3,:,iTemp] = -10*np.ones((1,self.N_))
 
 
+
+        #print("             exchange of information from central to drones:", time.time() - aux1)
+
+        ##### parallelized part #####
         #aux1 = time.time()
-        ##### part to parallelize #####
+        refs_setop = [setOnlineParameters_ray.remote(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
+        multiquad_mpc_pAll_ = ray.get(refs_setop)
         for iQuad in range(self.nQuad_):
             # set online parameters for the MPC
-            self.MultiQuad_[iQuad].setOnlineParameters()
+            self.MultiQuad_[iQuad].mpc_pAll_ = multiquad_mpc_pAll_[iQuad]
 
-            # solve the mpc problem
-            self.MultiQuad_[iQuad].solveMPC()
-        #print("solving time:", time.time()-aux1)
+        #print("             set online parameters:", time.time() - aux1)
 
 
+        #aux1 = time.time()
+        problems = [self.MultiQuad_[iQuad].solveMPC_pre() for iQuad in range(self.nQuad_)]
+        #print("             pre mpc:", time.time() - aux1)
 
+        #aux1 = time.time()
+        #results = [solveMPC(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
+        refs = [solveMPC_ray.remote(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
+        results = ray.get(refs)
+
+        #print("             solving mpc:", time.time() - aux1)
+
+        #aux1 = time.time()
+        for iQuad in range(self.nQuad_):
+            # save values from the mpc problem
+            self.MultiQuad_[iQuad].solveMPC_pos(results[iQuad][0], results[iQuad][1], results[iQuad][2])
+
+        #print("             pos mpc:", time.time() - aux1)
+
+
+
+        #aux1 = time.time()
         for iQuad in range(self.nQuad_):
             # send and execute the control command
             self.MultiQuad_[iQuad].step()
@@ -123,6 +167,8 @@ class pyCSystem():
             # communicate the planned mpc path only in centralized planning
             if self.MultiQuad_[iQuad].modeCoor_ == 0 or self.MultiQuad_[iQuad].modeCoor_==-1: # sequential or prioritized
                 self.multi_quad_coor_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_
+
+        #print("             simulating and advancing the timestep:", time.time() - aux1)
 
         self.time_step_global_ += 1
 
@@ -174,13 +220,16 @@ class pyCSystem():
 
     def stepMultiAgent(self, comm_vector):
 
+        #aux1 = time.time()
         #retrive comm info
         comm_mtx = np.reshape(comm_vector, (self.nQuad_, self.nQuad_))
         self.multi_quad_comm_mtx_ = comm_mtx
+        #print("retrieve comm info time:", time.time() - aux1)
 
         # determine if evaluation environment
         self.set_evaluation_ = self.multi_quad_comm_mtx_[1,1]
 
+        #aux1 = time.time()
         # set quad initial positions and goals
         if self.multi_quad_comm_mtx_[0, 0] == -1:
             self.resetScenario()
@@ -192,15 +241,22 @@ class pyCSystem():
             self.rotateScenario()
         elif self.multi_quad_comm_mtx_[0, 0] == -5:
             self.circleRandomScenario()
+        #print("reset scenario:", time.time() - aux1)
 
+        #aux1 = time.time()
         # communication (message passing inside the system)
         self.multiQuadComm()
+        #print("communication on past computed trajs.:", time.time() - aux1)
 
+        #aux1 = time.time()
         #planning & step
         self.multiQuadMpcSimStep()
+        #print("planning & step time:", time.time() - aux1)
 
+        #aux1 = time.time()
         #system states
         self.getSystemState()
+        #print("get system states time:", time.time() - aux1)
 
         #return
         respData = np.concatenate([self.multi_quad_state_, self.multi_quad_goal_], axis = 0) # TODO: check that some are not concatenates
@@ -215,8 +271,8 @@ class pyCSystem():
         # reset the scenario, including quad initial state and goal
 
         # reset initial state
-        rand_idx = np.random.permutation(self.nQuad_) # randomize initial positions
-        #rand_idx = np.arange(0,self.nQuad_)
+        #rand_idx = np.random.permutation(self.nQuad_) # randomize initial positions
+        rand_idx = np.arange(0,self.nQuad_) # FOR DEBUGGING
         for iQuad in range(self.nQuad_):
             # initial state
             self.MultiQuad_[iQuad].pos_real_[0:3,0] = self.cfg_["quadStartPos"][0:3, rand_idx[iQuad]]
