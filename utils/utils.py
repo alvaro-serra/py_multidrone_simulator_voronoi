@@ -22,12 +22,12 @@ def predictQuadPathFromCom(quad_traj_com, quad_state_now, time_step_now, dt, err
     # predict other quad traj based on last communicated trajectory
 
     # get info from communicated trajectory
-    N = np.shape(quad_traj_com)[1] # quad_traj_com_ is 7xN
+    N = int(np.shape(quad_traj_com)[1]) # quad_traj_com_ is 7xN
     time_step_comm = quad_traj_com[0,0]
     quad_traj_pred = np.zeros((6,N)) # first vector is the first prediction step (NOT CURRENT STATE)
 
-    dN_elapsed = time_step_now - time_step_comm
-    dN_left = N -dN_elapsed
+    dN_elapsed = int(time_step_now - time_step_comm)
+    dN_left = int(N -dN_elapsed)
     if dN_elapsed <= N and dN_elapsed > 0 and dN_left > 0:
         # choose the comm pos
         state_from_comm = quad_traj_com[1:7, int(dN_elapsed)-1:int(dN_elapsed)]

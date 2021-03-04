@@ -209,6 +209,11 @@ def createMultiDroneSystem(nQuad = 12, nDynObs = 0):
         # set default quad and obs size
 
         # Create the server --> UNNECESSARY (this is what we want to avoid)
+        n_action = np.ones((nQuad, nQuad)) - np.eye(nQuad)
+        # n_action = np.zeros((nQuad,nQuad))
+        n_action[0, 0] = -1
+        sent_action = n_action.flatten()
+        System.stepMultiAgent(sent_action)
 
         return System
 
@@ -217,8 +222,8 @@ if __name__ == '__main__':
 
     nQuad = 12
     nDynObs = 0
-    System = createMultiDroneSystem(nQuad = nQuad, nDynObs = nDynObs)
-    ray.init(local_mode=False)
+    ray.init(local_mode=False, log_to_driver=False)
+    System = createMultiDroneSystem(nQuad=nQuad, nDynObs=nDynObs)
     # (i, j) --> robot i requests from robot j its traj. intention
     n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
     #n_action = np.zeros((nQuad,nQuad))
@@ -229,11 +234,12 @@ if __name__ == '__main__':
     for i in range(100):
         print("step:",i)
         aux1 = time.time()
-        System.stepMultiAgent(sent_action)
+        obs = System.stepMultiAgent(sent_action)
         n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
         #n_action = np.zeros((nQuad, nQuad))
         #n_action[1, 1] = -1
         sent_action = n_action.flatten()
+        #print(np.array(obs).reshape(nQuad,13))
         print("step time:", time.time() - aux1)
 
     print("time:", time.time() - aux2)
