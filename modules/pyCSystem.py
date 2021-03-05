@@ -324,8 +324,8 @@ class pyCSystem():
 
         for iQuad in range(self.nQuad_):
             # initial state
-            self.MultiQuad_[iQuad].pos_real_[0:3] = quadStartPos[0:3, iQuad]
-            self.MultiQuad_[iQuad].vel_real_[0:3] = quadStartVel[0:3, iQuad]
+            self.MultiQuad_[iQuad].pos_real_[0:3,0] = quadStartPos[0:3, iQuad]
+            self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, iQuad]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, iQuad]
             self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
@@ -339,7 +339,7 @@ class pyCSystem():
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
                                       self.MultiQuad_[iQuad].euler_real_], axis=0)
             z_start = np.zeros((self.model_["nvar"], 1))
-            z_start[self.index["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
+            z_start[self.index_["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
             mpc_plan = matlib.repmat(z_start, 1, self.model_["N"])
             # initialize MPC
             self.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)
@@ -375,8 +375,8 @@ class pyCSystem():
 
         for iQuad in range(self.nQuad_):
             # initial state
-            self.MultiQuad_[iQuad].pos_real_[0:3] = quadStartPos[0:3, iQuad]
-            self.MultiQuad_[iQuad].vel_real_[0:3] = quadStartVel[0:3, iQuad]
+            self.MultiQuad_[iQuad].pos_real_[0:3,0] = quadStartPos[0:3, iQuad]
+            self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, iQuad]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, iQuad]
             self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
@@ -390,7 +390,7 @@ class pyCSystem():
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
                                       self.MultiQuad_[iQuad].euler_real_], axis=0)
             z_start = np.zeros((self.model_["nvar"], 1))
-            z_start[self.index["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
+            z_start[self.index_["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
             mpc_plan = matlib.repmat(z_start, 1, self.model_["N"])
             # initialize MPC
             self.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)
@@ -406,7 +406,7 @@ class pyCSystem():
 
 
         # random swapping pairs of quads
-        num_pair = np.floor(self.nQuad_/2)  # number of pairs
+        num_pair = int(np.floor(self.nQuad_/2))  # number of pairs
         rand_idx = np.random.permutation(self.nQuad_)  # randomize index
 
         for iPair in range(num_pair):
@@ -425,8 +425,8 @@ class pyCSystem():
         rand_idx = np.random.permutation(self.nQuad_)  # randomize index
         for iQuad in range(self.nQuad_):
             # initial state
-            self.MultiQuad_[iQuad].pos_real_[0:3] = self.cfg_["quadStartPos"][0:3, rand_idx[iQuad]]
-            self.MultiQuad_[iQuad].vel_real_[0:3] = self.cfg_["quadStartVel"][0:3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].pos_real_[0:3,0] = self.cfg_["quadStartPos"][0:3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].vel_real_[0:3,0] = self.cfg_["quadStartVel"][0:3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = self.cfg_["quadStartPos"][3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
@@ -437,7 +437,7 @@ class pyCSystem():
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
                                       self.MultiQuad_[iQuad].euler_real_], axis=0)
             z_start = np.zeros((self.model_["nvar"], 1))
-            z_start[self.index["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
+            z_start[self.index_["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
             mpc_plan = matlib.repmat(z_start, 1, self.model_["N"])
             # initialize MPC
             self.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)
@@ -484,8 +484,8 @@ class pyCSystem():
 
         for iQuad in range(self.nQuad_):
             # initial state
-            self.MultiQuad_[iQuad].pos_real_[0:3] = quadStartPos[0:3, rand_idx[iQuad]]
-            self.MultiQuad_[iQuad].vel_real_[0:3] = quadStartVel[0:3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].pos_real_[0:3,0] = quadStartPos[0:3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
@@ -499,7 +499,7 @@ class pyCSystem():
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
                                       self.MultiQuad_[iQuad].euler_real_], axis=0)
             z_start = np.zeros((self.model_["nvar"], 1))
-            z_start[self.index["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
+            z_start[self.index_["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
             mpc_plan = matlib.repmat(z_start, 1, self.model_["N"])
             # initialize MPC
             self.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)

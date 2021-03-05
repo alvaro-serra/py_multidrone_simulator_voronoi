@@ -33,13 +33,13 @@ def scn_random(nQuad, xDim, yDim, zDim):
     resolution = 0.6
     # discrete the workspace
     xL = xDim[1] - xDim[0]
-    yL = yDim[1] - yDim[1]
-    zL = zDim[2] - zDim[2]
+    yL = yDim[1] - yDim[0]
+    zL = zDim[1] - zDim[0]
 
     # number of discrete points in each dimension
-    xN = np.floor(xL/resolution)
-    yN = np.floor(yL/resolution)
-    zN = np.floor(zL/0.6)
+    xN = int(np.floor(xL/resolution))
+    yN = int(np.floor(yL/resolution))
+    zN = int(np.floor(zL/0.6))
 
     #non-repeating integer sequence
     xidx_rand = np.random.permutation(xN)
