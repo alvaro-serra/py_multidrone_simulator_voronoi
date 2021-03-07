@@ -209,13 +209,32 @@ def createMultiDroneSystem(nQuad = 12, nDynObs = 0):
         # set default quad and obs size
 
         # Create the server --> UNNECESSARY (this is what we want to avoid)
-        n_action = np.ones((nQuad, nQuad)) - np.eye(nQuad)
+        n_action = np.zeros((nQuad, nQuad)) - np.eye(nQuad)
         # n_action = np.zeros((nQuad,nQuad))
         n_action[0, 0] = -1
         sent_action = n_action.flatten()
         System.stepMultiAgent(sent_action)
 
         return System
+
+def collision_check(quad_mat, quad1, quad2):
+    pos_quad_1 = quad_mat[quad1][0:3]
+    pos_quad_2 = quad_mat[quad2][0:3]
+    dist = np.linalg.norm(pos_quad_2 - pos_quad_1)
+    #print(dist)
+    return True if dist <= 0.6 else False
+
+def dist2goal(quad_mat, quad1):
+    pos_quad_1 = quad_mat[quad1][0:3]
+    pos_goal = quad_mat[quad1][9:12]
+    return np.linalg.norm(pos_goal - pos_quad_1)
+
+def norm_collision_check(quad_mat, quad1, quad2):
+    pos_quad_1 = quad_mat[quad1][0:3]
+    pos_quad_2 = quad_mat[quad2][0:3]
+    dif = pos_quad_2 - pos_quad_1
+    normdist = np.sqrt(dif[0] ** 2 / 0.6 ** 2 + dif[1] ** 2 / 0.6 ** 2 + dif[2] ** 2)
+    return True if normdist <= 0.99 else False
 
 
 if __name__ == '__main__':
@@ -230,6 +249,7 @@ if __name__ == '__main__':
     n_action[0,0] = -1
     sent_action = n_action.flatten()
 
+    collisions = 0
     aux2 = time.time()
     for i in range(100):
         print("step:",i)
@@ -239,8 +259,21 @@ if __name__ == '__main__':
         #n_action = np.zeros((nQuad, nQuad))
         #n_action[1, 1] = -1
         sent_action = n_action.flatten()
-        #print(np.array(obs).reshape(nQuad,13))
+        aux = np.array(obs).reshape(nQuad,13)
+        mat_info_array = list(aux[:, 0:13])
+
+        # collision check
+        for iQuad1 in range(nQuad):
+            for iQuad2 in range(nQuad):
+                if iQuad1 == iQuad2:
+                    continue
+                if norm_collision_check(mat_info_array, iQuad1, iQuad2):
+                    collisions += 0.5
+            print("distance to goal:", dist2goal(mat_info_array, iQuad1))
+
         print("step time:", time.time() - aux1)
+
+    print("collisions:",collisions) # pueden haber colisiones pero creo que hay algo mal establecido en el intercambio de info dependiendo de las comunicaciones
 
     print("time:", time.time() - aux2)
     print("everything's over")

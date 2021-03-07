@@ -53,7 +53,7 @@ class pyCSystem():
         #self.GraphicCom_ = pyCGraphicCom(true, cfg, nQuad, nDynObs, model["N"]) # TODO pyCGraphycCom
 
         self.multi_quad_state_ = np.zeros((9, model["nQuad"]))
-        self.multi_quad_goal_ = cfg["quad"]["goal"]
+        self.multi_quad_goal_ = cfg["quad"]["goal"].copy()
         self.multi_quad_input_ = np.zeros((4, model["nQuad"]))
         self.multi_quad_slack_ = np.zeros((2, model["nQuad"]))
         self.multi_quad_mpc_path_ = np.zeros((3, model["N"], model["nQuad"]))
@@ -86,9 +86,9 @@ class pyCSystem():
             self.MultiQuad_[iQuad].getEstimatedSystemState()
 
             # set configuration parameters
-            self.MultiQuad_[iQuad].quad_goal_ = self.multi_quad_goal_[0:4,iQuad:iQuad+1]
-            self.MultiQuad_[iQuad].mpc_coll_ = self.para_mpc_coll_
-            self.MultiQuad_[iQuad].mpc_weights_ = self.para_mpc_weights
+            self.MultiQuad_[iQuad].quad_goal_[:,:] = self.multi_quad_goal_[0:4,iQuad:iQuad+1]
+            self.MultiQuad_[iQuad].mpc_coll_[:,:] = self.para_mpc_coll_
+            self.MultiQuad_[iQuad].mpc_weights_[:,:] = self.para_mpc_weights
 
             # get predicted obstacles path
             #self.MultiQuad_[iQuad].getObsPredictedPath() # TODO get obstacles predicted path inside pyCDrone
@@ -133,7 +133,7 @@ class pyCSystem():
         multiquad_mpc_pAll_ = ray.get(refs_setop)
         for iQuad in range(self.nQuad_):
             # set online parameters for the MPC
-            self.MultiQuad_[iQuad].mpc_pAll_ = multiquad_mpc_pAll_[iQuad]
+            self.MultiQuad_[iQuad].mpc_pAll_ = multiquad_mpc_pAll_[iQuad].copy()
 
         #print("             set online parameters:", time.time() - aux1)
 
@@ -188,10 +188,10 @@ class pyCSystem():
 
             # the following part is not used when using learned comm. policies
             if self.MultiQuad_[iQuad].modeCoor_ == 1: # path communication (distributed)
-                self.multi_quad_coor_path_ = self.multi_quad_mpc_path_
+                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
 
             elif self.MultiQuad_[iQuad].modeCoor_== 2: # path prediction based on constant v
-                self.multi_quad_coor_path_ = self.multi_quad_prep_path_
+                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_prep_path_
 
 
     def getSystemState(self):
@@ -207,7 +207,7 @@ class pyCSystem():
             self.multi_quad_mpc_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_
 
         #obs
-        self.multi_obs_path_ = self.MultiQuad_[self.nQuad_-1].obs_path_
+        self.multi_obs_path_[:,:,:] = self.MultiQuad_[self.nQuad_-1].obs_path_
         self.multi_obs_state_[0:3, :] = self.multi_obs_path_[0:3,1,:]
         self.multi_obs_state_[3:6,:] = (self.multi_obs_path_[0:3,1,:]-self.multi_obs_path_[0:3,0,:]) / self.dt_
 
@@ -223,7 +223,7 @@ class pyCSystem():
         #aux1 = time.time()
         #retrive comm info
         comm_mtx = np.reshape(comm_vector, (self.nQuad_, self.nQuad_))
-        self.multi_quad_comm_mtx_ = comm_mtx
+        self.multi_quad_comm_mtx_[:,:] = comm_mtx
         #print("retrieve comm info time:", time.time() - aux1)
 
         # determine if evaluation environment
@@ -271,17 +271,17 @@ class pyCSystem():
         # reset the scenario, including quad initial state and goal
 
         # reset initial state
-        #rand_idx = np.random.permutation(self.nQuad_) # randomize initial positions
-        rand_idx = np.arange(0,self.nQuad_) # FOR DEBUGGING
+        rand_idx = np.random.permutation(self.nQuad_) # randomize initial positions
+        #rand_idx = np.arange(0,self.nQuad_) # FOR DEBUGGING
         for iQuad in range(self.nQuad_):
             # initial state
             self.MultiQuad_[iQuad].pos_real_[0:3,0] = self.cfg_["quadStartPos"][0:3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].vel_real_[0:3,0] = self.cfg_["quadStartVel"][0:3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3,1))
             self.MultiQuad_[iQuad].euler_real_[2] = self.cfg_["quadStartPos"][3, rand_idx[iQuad]]
-            self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
-            self.MultiQuad_[iQuad].vel_est_ = self.MultiQuad_[iQuad].vel_real_
-            self.MultiQuad_[iQuad].euler_est_ = self.MultiQuad_[iQuad].euler_real_
+            self.MultiQuad_[iQuad].pos_est_[:,:] = self.MultiQuad_[iQuad].pos_real_
+            self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
+            self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
             # goal
             self.multi_quad_goal_[:,iQuad] = self.cfg_["quadEndPos"][:, rand_idx[iQuad]]
@@ -303,24 +303,24 @@ class pyCSystem():
                 #                                         [self.cfg_["quad"]["noise"]["pos"][1, 2]],
                 #                                         [self.cfg_["quad"]["noise"]["pos"][0, 2]]])
 
-        self.multi_quad_prep_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
         #self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
-        self.multi_quad_coor_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
         #self.multi_quad_coor_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
 
     def randomScenario(self):
         # random set the scenario, including quad initial state and goal
 
 
-        xDim = np.array([-self.cfg_["ws"][0]+self.cfg_["quad"]["size"][0], self.cfg_["ws"][0]-self.cfg_["quad"]["size"][0]])
+        xDim = np.array([-self.cfg_["ws"][0]+self.cfg_["quad"]["size"][0], self.cfg_["ws"][0]-self.cfg_["quad"]["size"][0]]).copy()
         yDim = np.array(
-            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]])
+            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]]).copy()
         zDim = np.array(
-            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]])
+            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]]).copy()
 
         quadStartPos, quadStartVel, quadEndPos = scn_random(self.nQuad_, xDim, yDim, zDim)
 
-        self.multi_quad_goal_ = quadEndPos
+        self.multi_quad_goal_[:,:] = quadEndPos
 
         for iQuad in range(self.nQuad_):
             # initial state
@@ -328,9 +328,9 @@ class pyCSystem():
             self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, iQuad]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, iQuad]
-            self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
-            self.MultiQuad_[iQuad].vel_est_ = self.MultiQuad_[iQuad].vel_real_
-            self.MultiQuad_[iQuad].euler_est_ = self.MultiQuad_[iQuad].euler_real_
+            self.MultiQuad_[iQuad].pos_est_[:,:] = self.MultiQuad_[iQuad].pos_real_
+            self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
+            self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
             # goal
             self.multi_quad_goal_[:, iQuad] = self.cfg_["quadEndPos"][:, iQuad]
@@ -353,9 +353,9 @@ class pyCSystem():
                 #                                         [self.cfg_["quad"]["noise"]["pos"][1, 2]],
                 #                                         [self.cfg_["quad"]["noise"]["pos"][0, 2]]])
 
-        self.multi_quad_prep_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
-        self.multi_quad_coor_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_coor_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
 
     def randomSwapScenario(self):
@@ -363,11 +363,11 @@ class pyCSystem():
 
 
         xDim = np.array(
-            [-self.cfg_["ws"][0] + self.cfg_["quad"]["size"][0], self.cfg_["ws"][0] - self.cfg_["quad"]["size"][0]])
+            [-self.cfg_["ws"][0] + self.cfg_["quad"]["size"][0], self.cfg_["ws"][0] - self.cfg_["quad"]["size"][0]]).copy()
         yDim = np.array(
-            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]])
+            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]]).copy()
         zDim = np.array(
-            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]])
+            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]]).copy()
 
         quadStartPos, quadStartVel, quadEndPos = scn_random(self.nQuad_, xDim, yDim, zDim)
 
@@ -379,9 +379,9 @@ class pyCSystem():
             self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, iQuad]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, iQuad]
-            self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
-            self.MultiQuad_[iQuad].vel_est_ = self.MultiQuad_[iQuad].vel_real_
-            self.MultiQuad_[iQuad].euler_est_ = self.MultiQuad_[iQuad].euler_real_
+            self.MultiQuad_[iQuad].pos_est_[:,:] = self.MultiQuad_[iQuad].pos_real_
+            self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
+            self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
             # goal
             self.multi_quad_goal_[:, iQuad] = self.cfg_["quadEndPos"][:, iQuad]
@@ -413,9 +413,9 @@ class pyCSystem():
             self.multi_quad_goal_[:, rand_idx[2*iPair-1]] = quadStartPos[:, rand_idx[2*iPair]]
             self.multi_quad_goal_[:, rand_idx[2*iPair]] = quadStartPos[:, rand_idx[2*iPair-1]]
 
-        self.multi_quad_prep_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
-        self.multi_quad_coor_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_coor_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
 
     def rotateScenario(self):
@@ -429,9 +429,9 @@ class pyCSystem():
             self.MultiQuad_[iQuad].vel_real_[0:3,0] = self.cfg_["quadStartVel"][0:3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = self.cfg_["quadStartPos"][3, rand_idx[iQuad]]
-            self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
-            self.MultiQuad_[iQuad].vel_est_ = self.MultiQuad_[iQuad].vel_real_
-            self.MultiQuad_[iQuad].euler_est_ = self.MultiQuad_[iQuad].euler_real_
+            self.MultiQuad_[iQuad].pos_est_[:,:] = self.MultiQuad_[iQuad].pos_real_
+            self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
+            self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
             # for mpc
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
@@ -468,9 +468,9 @@ class pyCSystem():
 
             self.multi_quad_goal_[:, iQuad] = self.cfg_["quadStartPos"][:, goal_idx]
 
-        self.multi_quad_prep_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
-        self.multi_quad_coor_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_coor_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
 
     def circleRandomScenario(self):
@@ -478,7 +478,7 @@ class pyCSystem():
 
         quadStartPos, quadStartVel, quadEndPos = scn_circle_random(self.nQuad_, 2.8, 5.4)
 
-        self.multi_quad_goal_ = quadEndPos
+        self.multi_quad_goal_[:,:] = quadEndPos
 
         rand_idx = np.random.permutation(self.nQuad_)
 
@@ -488,9 +488,9 @@ class pyCSystem():
             self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, rand_idx[iQuad]]
             self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
             self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, rand_idx[iQuad]]
-            self.MultiQuad_[iQuad].pos_est_ = self.MultiQuad_[iQuad].pos_real_
-            self.MultiQuad_[iQuad].vel_est_ = self.MultiQuad_[iQuad].vel_real_
-            self.MultiQuad_[iQuad].euler_est_ = self.MultiQuad_[iQuad].euler_real_
+            self.MultiQuad_[iQuad].pos_est_[:,:] = self.MultiQuad_[iQuad].pos_real_
+            self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
+            self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
             # goal
             self.multi_quad_goal_[:, iQuad] = quadEndPos[:, rand_idx[iQuad]]
@@ -513,8 +513,8 @@ class pyCSystem():
                 #                                         [self.cfg_["quad"]["noise"]["pos"][1, 2]],
                 #                                         [self.cfg_["quad"]["noise"]["pos"][0, 2]]])
 
-        self.multi_quad_prep_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
-        self.multi_quad_coor_path_ = self.multi_quad_mpc_path_
+        self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_coor_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
 

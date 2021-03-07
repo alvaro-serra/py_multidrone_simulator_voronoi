@@ -95,16 +95,19 @@ class pyCDrone():
         self.euler_real_ = np.zeros((3,1))
 
         # estimated state
+        self.pos_est_ = np.zeros((3,1))
+        self.vel_est_ = np.zeros((3,1))
+        self.euler_est_ = np.zeros((3,1))
         self.pos_est_cov_ = np.eye(3)
         self.vel_est_cov_ = np.eye(3)
         self.euler_est_cov_ = np.eye(3)
 
         # running para
         self.quad_goal_ = np.zeros((4,1))
-        self.mpc_coll_ = np.zeros((2,2))
+        self.mpc_coll_ = np.zeros((3,2))
         self.mpc_weights_ = np.zeros((4,2))
 
-        #mpc plan
+        # mpc plan
         self.mpc_pAll_ = None
         self.mpc_exitflag_ = None
         self.mpc_info_ = None
@@ -112,6 +115,11 @@ class pyCDrone():
         self.mpc_ZK_ = None
         self.mpc_Zk2_ = None
         self.mpc_ZPlan_ = None
+
+        # control input
+        self.u_mpc_ = np.zeros((4,1))
+        self.u_body_ = np.zeros((4,1))
+
 
 
 
@@ -162,9 +170,9 @@ class pyCDrone():
     def initializeMPC(self, x_start, mpc_plan):
         # initialize the initial conditions for the MPC solver with
         # x_start and mpc_plan, only used when necessary.
-        self.mpc_Xk_ = x_start
-        self.mpc_ZPlan_ = mpc_plan
-        self.mpc_Path_ = mpc_plan[self.index_["z"]["pos"],:]
+        self.mpc_Xk_ = x_start.copy()
+        self.mpc_ZPlan_ = mpc_plan.copy()
+        self.mpc_Path_[:,:] = mpc_plan[self.index_["z"]["pos"],:]
 
     #def initializeROS(self): Not needed for the moment
     # Initialize ROS publishers and subscribers for the quadrotor
@@ -177,11 +185,11 @@ class pyCDrone():
 
     def getEstimatedSystemState(self):
         #always simulated
-        assert self.cfg_["modeSim"]
+        assert self.cfg_["modeSim"] == 1
         # set estimated state the same as real one
-        self.pos_est_ = self.pos_real_
-        self.vel_est_ = self.vel_real_
-        self.euler_est_ = self.euler_real_
+        self.pos_est_[:,:] = self.pos_real_
+        self.vel_est_[:,:] = self.vel_real_
+        self.euler_est_[:,:] = self.euler_real_
 
         # add noise if necessary ( NOT NECESSARY, only with chance constraints )
 
@@ -200,7 +208,7 @@ class pyCDrone():
         # prepare parameters
         envDim = self.cfg_["ws"]
         startPos = np.concatenate([self.pos_est_, [self.euler_est_[2]]], 0)
-        wayPoint = self.quad_goal_
+        wayPoint = self.quad_goal_.copy()
         egoSize = self.size_
         weightStage = self.mpc_weights_[:,0]
         weightN = self.mpc_weights_[:,1]
@@ -258,8 +266,8 @@ class pyCDrone():
         self.mpc_Xk_ = np.concatenate([self.pos_est_, self.vel_est_, self.euler_est_], 0)
 
         problem = {}
-        problem["all_parameters"] = self.mpc_pAll_
-        problem["xinit"] = self.mpc_Xk_
+        problem["all_parameters"] = self.mpc_pAll_.copy()
+        problem["xinit"] = self.mpc_Xk_.copy()
 
         #prepare initial guess
         #self.mpc_exitflag_ = 0 # for debugging
@@ -271,7 +279,7 @@ class pyCDrone():
             x0_temp_stage[self.index_["z"]["pos"]+self.index_["z"]["vel"]+self.index_["z"]["euler"]] = self.mpc_Xk_
             x0_temp = matlib.repmat(x0_temp_stage, self.N_, 1)
 
-        problem["x0"] = x0_temp
+        problem["x0"] = x0_temp.copy()
         #problem["num_of_threads"] = 1
 
         # call the NLP solver
@@ -291,8 +299,8 @@ class pyCDrone():
             self.mpc_traj_[0,iStage] = self.time_step_global_
             self.mpc_traj_[1:7, iStage] = self.mpc_ZPlan_[self.index_["z"]["pos"]+self.index_["z"]["vel"], iStage]
 
-        self.mpc_Zk_ = self.mpc_ZPlan_[:,0:1]
-        self.mpc_Zk2_ = self.mpc_ZPlan_[:,1:2]
+        self.mpc_Zk_ = self.mpc_ZPlan_[:,0:1].copy()
+        self.mpc_Zk2_ = self.mpc_ZPlan_[:,1:2].copy()
 
 
         # check the exitflag and get optimal control input
@@ -316,7 +324,7 @@ class pyCDrone():
 
         if EXITFLAG == 1:
             #if mpc solved successfully
-            self.u_mpc_ = self.mpc_Zk_[self.index_["z"]["inputs"]]
+            self.u_mpc_[:,:] = self.mpc_Zk_[self.index_["z"]["inputs"]]
         else:
             # if infeasible
             self.u_mpc_ = -0.0 * self.u_mpc_
@@ -345,9 +353,9 @@ class pyCDrone():
             x0_temp = matlib.repmat(x0_temp_stage, self.N_, 1)
 
         problem = {}
-        problem["all_parameters"] = self.mpc_pAll_
-        problem["xinit"] = self.mpc_Xk_
-        problem["x0"] = x0_temp
+        problem["all_parameters"] = self.mpc_pAll_.copy()
+        problem["xinit"] = self.mpc_Xk_.copy()
+        problem["x0"] = x0_temp.copy()
 
         return problem
 
@@ -375,8 +383,8 @@ class pyCDrone():
             self.mpc_traj_[0, iStage] = self.time_step_global_
             self.mpc_traj_[1:7, iStage] = self.mpc_ZPlan_[self.index_["z"]["pos"] + self.index_["z"]["vel"], iStage]
 
-        self.mpc_Zk_ = self.mpc_ZPlan_[:, 0:1]
-        self.mpc_Zk2_ = self.mpc_ZPlan_[:, 1:2]
+        self.mpc_Zk_ = self.mpc_ZPlan_[:, 0:1].copy()
+        self.mpc_Zk2_ = self.mpc_ZPlan_[:, 1:2].copy()
 
         # check the exitflag and get optimal control input
         if EXITFLAG == 0:
@@ -398,7 +406,7 @@ class pyCDrone():
 
         if EXITFLAG == 1:
             # if mpc solved successfully
-            self.u_mpc_ = self.mpc_Zk_[self.index_["z"]["inputs"]]
+            self.u_mpc_[:,:] = self.mpc_Zk_[self.index_["z"]["inputs"]]
         else:
             # if infeasible
             self.u_mpc_ = -0.0 * self.u_mpc_
@@ -418,16 +426,16 @@ class pyCDrone():
         # simulate one step in simple simulation mode
         # current state and control
         xNow = np.concatenate([self.pos_real_, self.vel_real_, self.euler_real_],0)
-        u = self.u_mpc_ # use u_mpc in simulation --> no need to transform to local
+        u = self.u_mpc_.copy() # use u_mpc in simulation --> no need to transform to local
 
         # integrate one step
         xNext = RK2(xNow, u, [0,self.dt_])
 
 
         #update the implicit real state
-        self.pos_real_ = xNext[self.index_["x"]["pos"]]
-        self.vel_real_ = xNext[self.index_["x"]["vel"]]
-        self.euler_real_ = xNext[self.index_["x"]["euler"]]
+        self.pos_real_[:,:] = xNext[self.index_["x"]["pos"]]
+        self.vel_real_[:,:] = xNext[self.index_["x"]["vel"]]
+        self.euler_real_[:,:] = xNext[self.index_["x"]["euler"]]
 
     def propagateStateCov(self): # NOT NECESSARY, ONLY WHEN CONSIDERING CHANCE CONSTRAINTS
         #Propagate uncertainty covariance along the path
