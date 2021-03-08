@@ -44,14 +44,14 @@ def setOnlineParameters_ray(Quad):
 
     # all stage parameters
     pStage = np.zeros((Quad.npar_, 1))
-    mpc_pAll_ = np.array(matlib.repmat(pStage, Quad.N_, 1))
+    mpc_pAll_ = matlib.repmat(pStage, Quad.N_, 1)
     for iStage in range(0,Quad.N_):
         #general parameter
-        pStage[Quad.index_["p"]["envDim"]] = np.array(envDim)
-        pStage[Quad.index_["p"]["startPos"]] = np.array(startPos)
-        pStage[Quad.index_["p"]["wayPoint"]] = np.array(wayPoint)
-        pStage[Quad.index_["p"]["size"]] = np.array(egoSize)
-        pStage[Quad.index_["p"]["weights"], 0] = np.array(weightStage)
+        pStage[Quad.index_["p"]["envDim"]] = envDim
+        pStage[Quad.index_["p"]["startPos"]] = startPos
+        pStage[Quad.index_["p"]["wayPoint"]] = wayPoint
+        pStage[Quad.index_["p"]["size"]] = egoSize
+        pStage[Quad.index_["p"]["weights"], 0] = weightStage
         # obstacle information, including other quadrotors
         # and moving obstacles, set other quad first
         idx = 0
@@ -59,9 +59,9 @@ def setOnlineParameters_ray(Quad):
             if iQuad == Quad.id_:
                 continue
             else:
-                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = np.array(quadPath[:, iStage,iQuad:iQuad+1])
-                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = np.array(quadSize)
-                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = np.array(quadColl)
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = quadPath[:, iStage,iQuad:iQuad+1]
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = quadSize
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = quadColl
                 idx = idx + 1
 
         for jObs in range(Quad.nDynObs_):
@@ -76,7 +76,7 @@ def setOnlineParameters_ray(Quad):
 
         # insert into the all stage parameter
         mpc_pAll_[Quad.npar_ * iStage : Quad.npar_ * (iStage+1)] = pStage
-    return np.array(mpc_pAll_)
+    return mpc_pAll_
 
 
 class pyCDrone():
@@ -221,7 +221,7 @@ class pyCDrone():
 
         # all stage parameters
         pStage = np.zeros((self.npar_, 1))
-        self.mpc_pAll_ = matlib.repmat(pStage, self.N_, 1).copy()
+        self.mpc_pAll_ = matlib.repmat(pStage, self.N_, 1)
         for iStage in range(0,self.N_):
             #general parameter
             pStage[self.index_["p"]["envDim"]] = envDim
@@ -279,7 +279,7 @@ class pyCDrone():
             x0_temp_stage[self.index_["z"]["pos"]+self.index_["z"]["vel"]+self.index_["z"]["euler"]] = self.mpc_Xk_
             x0_temp = matlib.repmat(x0_temp_stage, self.N_, 1)
 
-        problem["x0"] = x0_temp.copy()
+        problem["x0"] = x0_temp
         #problem["num_of_threads"] = 1
 
         # call the NLP solver
@@ -432,9 +432,9 @@ class pyCDrone():
 
 
         #update the implicit real state
-        self.pos_real_[:,:] = xNext[self.index_["x"]["pos"]].copy()
-        self.vel_real_[:,:] = xNext[self.index_["x"]["vel"]].copy()
-        self.euler_real_[:,:] = xNext[self.index_["x"]["euler"]].copy()
+        self.pos_real_[:,:] = xNext[self.index_["x"]["pos"]]
+        self.vel_real_[:,:] = xNext[self.index_["x"]["vel"]]
+        self.euler_real_[:,:] = xNext[self.index_["x"]["euler"]]
 
     def propagateStateCov(self): # NOT NECESSARY, ONLY WHEN CONSIDERING CHANCE CONSTRAINTS
         #Propagate uncertainty covariance along the path
@@ -483,7 +483,7 @@ class pyCDrone():
 
     def predictPathConstantV(self):
         # Predict quad path based on constant velocity assumption
-        self.pred_path_[:,0:1] = self.pos_est_.copy()
+        self.pred_path_[:,0:1] = self.pos_est_
         self.pred_pathcov_[:, 1] = np.array([self.pos_est_cov_[0,0], self.pos_est_cov_[1,1],
                                              self.pos_est_cov_[2,2], self.pos_est_cov_[0,1],
                                              self.pos_est_cov_[1,2], self.pos_est_cov_[0,2]])
@@ -502,10 +502,10 @@ class pyCDrone():
         for iStage in range(1, self.N_):
             xpred = np.matmul(F,xpred)
             Ppred = np.matmul(F,np.matmul(Ppred,F.T))
-            self.pred_path_[:, iStage] = xpred[0:3, 0].copy()
+            self.pred_path_[:, iStage] = xpred[0:3, 0]
             self.pred_pathcov_[:, iStage] = np.array([Ppred[0,0],
                                                       Ppred[1,1],
                                                       Ppred[2,2],
                                                       Ppred[0,1],
                                                       Ppred[1,2],
-                                                      Ppred[0,2]]).copy()
+                                                      Ppred[0,2]])

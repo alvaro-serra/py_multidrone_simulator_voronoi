@@ -275,8 +275,8 @@ if __name__ == '__main__':
     ray.init(local_mode=False, log_to_driver=False)
     System = createMultiDroneSystem(nQuad=nQuad, nDynObs=nDynObs)
     # (i, j) --> robot i requests from robot j its traj. intention
-    #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-    n_action = np.zeros((nQuad,nQuad))
+    n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+    #n_action = np.zeros((nQuad,nQuad))
     n_action[0,0] = -1
     sent_action = n_action.flatten()
 
@@ -286,13 +286,13 @@ if __name__ == '__main__':
         print("step:",i)
         aux1 = time.time()
         obs = System.stepMultiAgent(sent_action)
-        #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-        n_action = np.zeros((nQuad, nQuad))
+        n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+        #n_action = np.zeros((nQuad, nQuad))
         #n_action[1, 1] = -1
         sent_action = n_action.flatten()
         aux = np.array(obs).reshape(nQuad,13)
         mat_info_array = list(aux[:, 0:13])
-        """
+
         # collision check
         for iQuad1 in range(nQuad):
             for iQuad2 in range(nQuad):
@@ -301,7 +301,7 @@ if __name__ == '__main__':
                 if norm_collision_check(mat_info_array, iQuad1, iQuad2):
                     collisions += 0.5
             print("distance to goal:", dist2goal(mat_info_array, iQuad1))
-        """
+
 
         print("step time:", time.time() - aux1)
 

@@ -79,7 +79,7 @@ class pyCSystem():
     # publish dyn obs path in simulation mode
 
     def multiQuadMpcSimStep(self):
-        #aux1 = time.time()
+        aux1 = time.time()
         # sequential mpc control and sim one step for the system
         for iQuad in range(self.nQuad_):
             # get estimated state of the ego quad
@@ -95,9 +95,9 @@ class pyCSystem():
 
             # for each quad, get path of other quads
             if self.MultiQuad_[iQuad].modeCoor_ == -1:  #centralized prioritized planning
-                self.MultiQuad_[iQuad].quad_path_ = self.multi_quad_coor_path_[:,:,0:iQuad].copy()
+                self.MultiQuad_[iQuad].quad_path_[:,:,:] = self.multi_quad_coor_path_[:,:,0:iQuad]
             elif self.MultiQuad_[iQuad].modeCoor_== 0:   #centralized sequential planning
-                self.MultiQuad_[iQuad].quad_path_ = self.multi_quad_coor_path_[:,:,:].copy()
+                self.MultiQuad_[iQuad].quad_path_[:,:,:] = self.multi_quad_coor_path_[:,:,:]
 
             else:
                 # consider communication
@@ -125,40 +125,40 @@ class pyCSystem():
 
 
 
-        #print("             exchange of information from central to drones:", time.time() - aux1)
+        print("             exchange of information from central to drones:", time.time() - aux1)
 
         ##### parallelized part #####
-        #aux1 = time.time()
+        aux1 = time.time()
         refs_setop = [setOnlineParameters_ray.remote(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
         multiquad_mpc_pAll_ = ray.get(refs_setop)
         for iQuad in range(self.nQuad_):
             # set online parameters for the MPC
-            self.MultiQuad_[iQuad].mpc_pAll_ = multiquad_mpc_pAll_[iQuad].copy()
+            self.MultiQuad_[iQuad].mpc_pAll_ = multiquad_mpc_pAll_[iQuad]
 
-        #print("             set online parameters:", time.time() - aux1)
+        print("             set online parameters:", time.time() - aux1)
 
 
-        #aux1 = time.time()
+        aux1 = time.time()
         problems = [self.MultiQuad_[iQuad].solveMPC_pre() for iQuad in range(self.nQuad_)]
-        #print("             pre mpc:", time.time() - aux1)
+        print("             pre mpc:", time.time() - aux1)
 
-        #aux1 = time.time()
+        aux1 = time.time()
         #results = [solveMPC(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
         refs = [solveMPC_ray.remote(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
         results = ray.get(refs)
 
-        #print("             solving mpc:", time.time() - aux1)
+        print("             solving mpc:", time.time() - aux1)
 
-        #aux1 = time.time()
+        aux1 = time.time()
         for iQuad in range(self.nQuad_):
             # save values from the mpc problem
             self.MultiQuad_[iQuad].solveMPC_pos(results[iQuad][0], results[iQuad][1], results[iQuad][2])
 
-        #print("             pos mpc:", time.time() - aux1)
+        print("             pos mpc:", time.time() - aux1)
 
 
 
-        #aux1 = time.time()
+        aux1 = time.time()
         for iQuad in range(self.nQuad_):
             # send and execute the control command
             self.MultiQuad_[iQuad].step()
@@ -168,7 +168,7 @@ class pyCSystem():
             if self.MultiQuad_[iQuad].modeCoor_ == 0 or self.MultiQuad_[iQuad].modeCoor_==-1: # sequential or prioritized
                 self.multi_quad_coor_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_
 
-        #print("             simulating and advancing the timestep:", time.time() - aux1)
+        print("             simulating and advancing the timestep:", time.time() - aux1)
 
         self.time_step_global_ += 1
 
@@ -180,7 +180,7 @@ class pyCSystem():
 
             # path prediction using constant v
             self.MultiQuad_[iQuad].predictPathConstantV()
-            self.multi_quad_prep_path_[:,:,iQuad] = self.MultiQuad_[iQuad].pred_path_.copy()
+            self.multi_quad_prep_path_[:,:,iQuad] = self.MultiQuad_[iQuad].pred_path_
 
             self.multi_quad_mpc_path_[:,0:self.N_-1, iQuad] = self.MultiQuad_[iQuad].mpc_Path_[:,1:self.N_]
             self.multi_quad_mpc_path_[:,self.N_-1:self.N_,iQuad] = self.MultiQuad_[iQuad].mpc_Path_[:,self.N_-1:self.N_] +\
@@ -188,10 +188,10 @@ class pyCSystem():
 
             # the following part is not used when using learned comm. policies
             if self.MultiQuad_[iQuad].modeCoor_ == 1: # path communication (distributed)
-                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_.copy()
+                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
 
             elif self.MultiQuad_[iQuad].modeCoor_== 2: # path prediction based on constant v
-                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_prep_path_.copy()
+                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_prep_path_
 
 
     def getSystemState(self):
@@ -202,13 +202,13 @@ class pyCSystem():
             self.multi_quad_state_[:,iQuad:iQuad+1] = np.concatenate([self.MultiQuad_[iQuad].pos_real_,
                                                         self.MultiQuad_[iQuad].vel_real_,
                                                         self.MultiQuad_[iQuad].euler_real_],0)
-            self.multi_quad_input_[:,iQuad:iQuad+1] = self.MultiQuad_[iQuad].u_body_.copy()
-            self.multi_quad_slack_[:,iQuad:iQuad+1] = 10*self.MultiQuad_[iQuad].mpc_Zk_[self.index_["z"]["slack"]].copy()
-            self.multi_quad_mpc_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_.copy()
+            self.multi_quad_input_[:,iQuad:iQuad+1] = self.MultiQuad_[iQuad].u_body_
+            self.multi_quad_slack_[:,iQuad:iQuad+1] = 10*self.MultiQuad_[iQuad].mpc_Zk_[self.index_["z"]["slack"]]
+            self.multi_quad_mpc_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_
 
         #obs
-        self.multi_obs_path_[:,:,:] = self.MultiQuad_[self.nQuad_-1].obs_path_.copy()
-        self.multi_obs_state_[0:3, :] = self.multi_obs_path_[0:3,1,:].copy()
+        self.multi_obs_path_[:,:,:] = self.MultiQuad_[self.nQuad_-1].obs_path_
+        self.multi_obs_state_[0:3, :] = self.multi_obs_path_[0:3,1,:]
         self.multi_obs_state_[3:6,:] = (self.multi_obs_path_[0:3,1,:]-self.multi_obs_path_[0:3,0,:]) / self.dt_
 
 
@@ -312,11 +312,11 @@ class pyCSystem():
         # random set the scenario, including quad initial state and goal
 
 
-        xDim = np.array([-self.cfg_["ws"][0]+self.cfg_["quad"]["size"][0], self.cfg_["ws"][0]-self.cfg_["quad"]["size"][0]]).copy()
+        xDim = np.array([-self.cfg_["ws"][0]+self.cfg_["quad"]["size"][0], self.cfg_["ws"][0]-self.cfg_["quad"]["size"][0]])
         yDim = np.array(
-            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]]).copy()
+            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]])
         zDim = np.array(
-            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]]).copy()
+            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]])
 
         quadStartPos, quadStartVel, quadEndPos = scn_random(self.nQuad_, xDim, yDim, zDim)
 
@@ -363,11 +363,11 @@ class pyCSystem():
 
 
         xDim = np.array(
-            [-self.cfg_["ws"][0] + self.cfg_["quad"]["size"][0], self.cfg_["ws"][0] - self.cfg_["quad"]["size"][0]]).copy()
+            [-self.cfg_["ws"][0] + self.cfg_["quad"]["size"][0], self.cfg_["ws"][0] - self.cfg_["quad"]["size"][0]])
         yDim = np.array(
-            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]]).copy()
+            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]])
         zDim = np.array(
-            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]]).copy()
+            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]])
 
         quadStartPos, quadStartVel, quadEndPos = scn_random(self.nQuad_, xDim, yDim, zDim)
 
