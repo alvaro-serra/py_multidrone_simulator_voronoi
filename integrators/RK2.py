@@ -30,7 +30,8 @@ def rk2a_onestep(x0, u, t):
     """
 
     n = len( t )
-    x = numpy.array( [ x0 ] * n )
+    #x = numpy.array( [ x0 ] * n )
+    x = numpy.array([x0.copy() for i in range(n)])
     for i in range( n - 1 ):
         h = t[i+1] - t[i]
         k1 = h * dynamics( x[i], u ) / 2.0

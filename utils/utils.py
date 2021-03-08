@@ -2,8 +2,8 @@ import numpy as np
 
 def predictStateConstantV(state_now, dt, N):
     state_pred = np.zeros((6,N))
-    state_pred[:,0:1] = state_now
-    xpred = state_now
+    state_pred[:,0:1] = state_now.copy()
+    xpred = state_now.copy()
     F = np.array([[1, 0, 0, dt, 0, 0],
                  [0, 1, 0, 0, dt, 0],
                  [0, 0, 1, 0, 0, dt],

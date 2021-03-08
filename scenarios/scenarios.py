@@ -16,8 +16,8 @@ def scn_circle(nQuad, radius):
 
         # end
         quadEndPos[0:2,iQuad:iQuad+1] = -quadStartPos[0:2,iQuad:iQuad+1]
-        quadEndPos[2,iQuad] = quadStartPos[2,iQuad]
-        quadEndPos[3,iQuad] = quadStartPos[3,iQuad]
+        quadEndPos[2,iQuad] = np.array(quadStartPos[2,iQuad])
+        quadEndPos[3,iQuad] = np.array(quadStartPos[3,iQuad])
 
     return quadStartPos, quadStartVel, quadEndPos
 
@@ -95,8 +95,8 @@ def scn_circle_random(nQuad, R_min, R_max):
         quadStartPos[3, iQuad] = np.deg2rad(0) # yaw
 
         # end
-        quadEndPos[0:2, iQuad] = -quadStartPos[0:2, iQuad]
-        quadEndPos[2, iQuad] = quadStartPos[2, iQuad]
-        quadEndPos[3, iQuad] = quadStartPos[3, iQuad]
+        quadEndPos[0:2, iQuad] = -np.array(quadStartPos[0:2, iQuad])
+        quadEndPos[2, iQuad] = np.array(quadStartPos[2, iQuad])
+        quadEndPos[3, iQuad] = np.array(quadStartPos[3, iQuad])
 
     return quadStartPos, quadStartVel, quadEndPos

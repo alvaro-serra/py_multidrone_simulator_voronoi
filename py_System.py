@@ -162,6 +162,32 @@ def createMultiDroneSystem(nQuad = 12, nDynObs = 0):
     cfg["ifShowQuadPathCov"] = 0
 
     ## Extra running configuration for chance constrained collision avoidance --> NOT NEEDED--> CAN USE MATLAB
+    cfg["quad"]["coll"][2] = 0.03
+    cfg["obs"]["coll"][2] = 0.03
+    #cfg["quad"]["deltaAux"]
+    #cfg["obs"]["deltaAux"]
+    #cfg["quad"]["Mahalanobis"]
+    # cfg["obs"]["Mahalanobis"]
+    ## default added noise to the quad
+    ## quad
+    cfg["addQuadStateNoise"] = 0
+    if cfg["application"] == "chance" or cfg["application"] == "chance_slack":
+        cfg["addQuadStateNoise"] = 1
+
+    cfg["quad"]["noise"] = {}
+    cfg["quad"]["noise"]["pos"] = np.diag(np.array([0.06, 0.06, 0.06]) ** 2)
+    cfg["quad"]["noise"]["vel"] = np.diag(np.array([0.01, 0.01, 0.01]) ** 2)
+    cfg["quad"]["noise"]["euler"] = np.diag(np.deg2rad([0.5, 0.5, 0.0]) ** 2)
+
+    ## obs
+    cfg["addObsStateNoise"] = 1
+    cfg["obs"]["noise"] = {}
+    cfg["obs"]["noise"]["pos"] = np.diag(np.array([0.04, 0.04, 0.04]) ** 2)
+    cfg["obs"]["noise"]["vel"] = np.diag(np.array([0.01, 0.01, 0.01]) ** 2)
+
+    # for extra visualization
+    cfg["quadPathCovShowNum"] = 5
+
     # <<<initialize_func<<<
 
     # Not necessary for the moment --> can be done through matlab
@@ -190,32 +216,37 @@ def createMultiDroneSystem(nQuad = 12, nDynObs = 0):
         # initialize mpc
         System.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)
 
-        # to avoid whom in prioritized planning --> NOT NECESSARY, CHECK MATLAB IMPLEMENTATION IF WE WANT TO ADAPT
-        #################################### Until here the fundamentally necessary ############################################
-        #################################### ADDITIONAL CONTENT ###############################################################
-        # Quad pathcov initialization --> UNNECESSARY (chance constraints)
-        """
-        for iQuad in range(model["nQuad"]):
-            System.multi_quad_state_[0:3,iQuad] = quadStartPos[0:3, iQuad]
-            for iStage in range(model["N"]):
-                System.multi_quad_mpc_path_[:, iStage, iQuad] = quadStartPos[0:3, iQuad]
-                System.multi_quad_mpc_pathcov_[:, iStage, iQuad] = [cfg["quad"]["noise"]["pos"][]]
-        """
+    # to avoid whom in prioritized planning --> NOT NECESSARY, CHECK MATLAB IMPLEMENTATION IF WE WANT TO ADAPT
+    #################################### Until here the fundamentally necessary ############################################
+    #################################### ADDITIONAL CONTENT ###############################################################
+    # Quad pathcov initialization --> UNNECESSARY (chance constraints)
 
-        # Set moving obstacle objects in simulation mode --> UNNECESSARY (no moving obstacles other than drones)
+    for iQuad in range(model["nQuad"]):
+        System.multi_quad_state_[0:3,iQuad] = quadStartPos[0:3, iQuad]
+        for iStage in range(model["N"]):
+            System.multi_quad_mpc_path_[:, iStage, iQuad] = quadStartPos[0:3, iQuad]
+            System.multi_quad_mpc_pathcov_[:, iStage, iQuad] = np.array([cfg["quad"]["noise"]["pos"][0,0], cfg["quad"]["noise"]["pos"][1,1],
+                                                                          cfg["quad"]["noise"]["pos"][2,2], cfg["quad"]["noise"]["pos"][0,1],
+                                                                          cfg["quad"]["noise"]["pos"][1,2], cfg["quad"]["noise"]["pos"][0,2]])
+    System.multi_quad_prep_path_[:,:,:] = System.multi_quad_mpc_path_
+    System.multi_quad_prep_pathcov_[:,:,:] = System.multi_quad_mpc_pathcov_
+    System.multi_quad_coor_path_[:,:,:] = System.multi_quad_mpc_path_
+    System.multi_quad_coor_pathcov_[:,:,:] = System.multi_quad_mpc_pathcov_
 
-        # TODO:Initialization graphic communicator
-        # initialize ROS
-        # set default quad and obs size
 
-        # Create the server --> UNNECESSARY (this is what we want to avoid)
-        n_action = np.zeros((nQuad, nQuad)) - np.eye(nQuad)
-        # n_action = np.zeros((nQuad,nQuad))
-        n_action[0, 0] = -1
-        sent_action = n_action.flatten()
-        System.stepMultiAgent(sent_action)
+    # TODO Set moving obstacle objects in simulation mode --> UNNECESSARY (no moving obstacles other than drones)
 
-        return System
+    # TODO:Initialization graphic communicator
+    # initialize ROS
+    # set default quad and obs size
+
+    #n_action = np.zeros((nQuad, nQuad))
+    # n_action = np.zeros((nQuad,nQuad))
+    #n_action[0, 0] = -1
+    #sent_action = n_action.flatten()
+    #System.stepMultiAgent(sent_action)
+
+    return System
 
 def collision_check(quad_mat, quad1, quad2):
     pos_quad_1 = quad_mat[quad1][0:3]
@@ -244,8 +275,8 @@ if __name__ == '__main__':
     ray.init(local_mode=False, log_to_driver=False)
     System = createMultiDroneSystem(nQuad=nQuad, nDynObs=nDynObs)
     # (i, j) --> robot i requests from robot j its traj. intention
-    n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-    #n_action = np.zeros((nQuad,nQuad))
+    #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+    n_action = np.zeros((nQuad,nQuad))
     n_action[0,0] = -1
     sent_action = n_action.flatten()
 
@@ -255,13 +286,13 @@ if __name__ == '__main__':
         print("step:",i)
         aux1 = time.time()
         obs = System.stepMultiAgent(sent_action)
-        n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-        #n_action = np.zeros((nQuad, nQuad))
+        #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+        n_action = np.zeros((nQuad, nQuad))
         #n_action[1, 1] = -1
         sent_action = n_action.flatten()
         aux = np.array(obs).reshape(nQuad,13)
         mat_info_array = list(aux[:, 0:13])
-
+        """
         # collision check
         for iQuad1 in range(nQuad):
             for iQuad2 in range(nQuad):
@@ -270,10 +301,11 @@ if __name__ == '__main__':
                 if norm_collision_check(mat_info_array, iQuad1, iQuad2):
                     collisions += 0.5
             print("distance to goal:", dist2goal(mat_info_array, iQuad1))
+        """
 
         print("step time:", time.time() - aux1)
 
-    print("collisions:",collisions) # pueden haber colisiones pero creo que hay algo mal establecido en el intercambio de info dependiendo de las comunicaciones
+    print("collisions:",collisions) # demasiadas colisiones cuando hay full communication. Darle una ultima mañana
 
     print("time:", time.time() - aux2)
     print("everything's over")

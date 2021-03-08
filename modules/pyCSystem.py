@@ -95,9 +95,9 @@ class pyCSystem():
 
             # for each quad, get path of other quads
             if self.MultiQuad_[iQuad].modeCoor_ == -1:  #centralized prioritized planning
-                self.MultiQuad_[iQuad].quad_path_[:,:,:] = self.multi_quad_coor_path_[:,:,0:iQuad]
+                self.MultiQuad_[iQuad].quad_path_ = self.multi_quad_coor_path_[:,:,0:iQuad].copy()
             elif self.MultiQuad_[iQuad].modeCoor_== 0:   #centralized sequential planning
-                self.MultiQuad_[iQuad].quad_path_[:,:,:] = self.multi_quad_coor_path_[:,:,:]
+                self.MultiQuad_[iQuad].quad_path_ = self.multi_quad_coor_path_[:,:,:].copy()
 
             else:
                 # consider communication
@@ -180,7 +180,7 @@ class pyCSystem():
 
             # path prediction using constant v
             self.MultiQuad_[iQuad].predictPathConstantV()
-            self.multi_quad_prep_path_[:,:,iQuad] = self.MultiQuad_[iQuad].pred_path_
+            self.multi_quad_prep_path_[:,:,iQuad] = self.MultiQuad_[iQuad].pred_path_.copy()
 
             self.multi_quad_mpc_path_[:,0:self.N_-1, iQuad] = self.MultiQuad_[iQuad].mpc_Path_[:,1:self.N_]
             self.multi_quad_mpc_path_[:,self.N_-1:self.N_,iQuad] = self.MultiQuad_[iQuad].mpc_Path_[:,self.N_-1:self.N_] +\
@@ -188,10 +188,10 @@ class pyCSystem():
 
             # the following part is not used when using learned comm. policies
             if self.MultiQuad_[iQuad].modeCoor_ == 1: # path communication (distributed)
-                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
+                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_.copy()
 
             elif self.MultiQuad_[iQuad].modeCoor_== 2: # path prediction based on constant v
-                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_prep_path_
+                self.multi_quad_coor_path_[:,:,:] = self.multi_quad_prep_path_.copy()
 
 
     def getSystemState(self):
@@ -202,13 +202,13 @@ class pyCSystem():
             self.multi_quad_state_[:,iQuad:iQuad+1] = np.concatenate([self.MultiQuad_[iQuad].pos_real_,
                                                         self.MultiQuad_[iQuad].vel_real_,
                                                         self.MultiQuad_[iQuad].euler_real_],0)
-            self.multi_quad_input_[:,iQuad:iQuad+1] = self.MultiQuad_[iQuad].u_body_
-            self.multi_quad_slack_[:,iQuad:iQuad+1] = 10*self.MultiQuad_[iQuad].mpc_Zk_[self.index_["z"]["slack"]]
-            self.multi_quad_mpc_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_
+            self.multi_quad_input_[:,iQuad:iQuad+1] = self.MultiQuad_[iQuad].u_body_.copy()
+            self.multi_quad_slack_[:,iQuad:iQuad+1] = 10*self.MultiQuad_[iQuad].mpc_Zk_[self.index_["z"]["slack"]].copy()
+            self.multi_quad_mpc_path_[:,:,iQuad] = self.MultiQuad_[iQuad].mpc_Path_.copy()
 
         #obs
-        self.multi_obs_path_[:,:,:] = self.MultiQuad_[self.nQuad_-1].obs_path_
-        self.multi_obs_state_[0:3, :] = self.multi_obs_path_[0:3,1,:]
+        self.multi_obs_path_[:,:,:] = self.MultiQuad_[self.nQuad_-1].obs_path_.copy()
+        self.multi_obs_state_[0:3, :] = self.multi_obs_path_[0:3,1,:].copy()
         self.multi_obs_state_[3:6,:] = (self.multi_obs_path_[0:3,1,:]-self.multi_obs_path_[0:3,0,:]) / self.dt_
 
 
@@ -271,8 +271,8 @@ class pyCSystem():
         # reset the scenario, including quad initial state and goal
 
         # reset initial state
-        rand_idx = np.random.permutation(self.nQuad_) # randomize initial positions
-        #rand_idx = np.arange(0,self.nQuad_) # FOR DEBUGGING
+        #rand_idx = np.random.permutation(self.nQuad_) # randomize initial positions
+        rand_idx = np.arange(0,self.nQuad_) # FOR DEBUGGING
         for iQuad in range(self.nQuad_):
             # initial state
             self.MultiQuad_[iQuad].pos_real_[0:3,0] = self.cfg_["quadStartPos"][0:3, rand_idx[iQuad]]

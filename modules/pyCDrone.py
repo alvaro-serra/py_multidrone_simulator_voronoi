@@ -15,13 +15,13 @@ def solveMPC_ray(all_parameters, xinit, x0): #Might be some issues with the shap
     # call the NLP solver
     #aux1 = time.time()
     problem = {}
-    problem['all_parameters'] = all_parameters.copy()
-    problem['xinit'] = xinit.copy()
-    problem['x0'] = x0.copy()
+    problem['all_parameters'] = np.array(all_parameters)
+    problem['xinit'] = np.array(xinit)
+    problem['x0'] = np.array(x0)
     OUTPUT, EXITFLAG, INFO = solver(problem)
     #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
     #print("Solving time drone:",time.time()-aux1)
-    return [OUTPUT.copy(), EXITFLAG, INFO]
+    return [OUTPUT, EXITFLAG, INFO]
 
 @ray.remote
 def setOnlineParameters_ray(Quad):
@@ -30,7 +30,7 @@ def setOnlineParameters_ray(Quad):
 
     # prepare parameters
     envDim = Quad.cfg_["ws"]
-    startPos = np.concatenate([Quad.pos_est_, [Quad.euler_est_[2]]], 0)
+    startPos = np.concatenate([Quad.pos_est_, np.array([Quad.euler_est_[2]])], 0)
     wayPoint = Quad.quad_goal_
     egoSize = Quad.size_
     weightStage = Quad.mpc_weights_[:,0]
@@ -44,14 +44,14 @@ def setOnlineParameters_ray(Quad):
 
     # all stage parameters
     pStage = np.zeros((Quad.npar_, 1))
-    mpc_pAll_ = matlib.repmat(pStage, Quad.N_, 1)
+    mpc_pAll_ = np.array(matlib.repmat(pStage, Quad.N_, 1))
     for iStage in range(0,Quad.N_):
         #general parameter
-        pStage[Quad.index_["p"]["envDim"]] = envDim
-        pStage[Quad.index_["p"]["startPos"]] = startPos
-        pStage[Quad.index_["p"]["wayPoint"]] = wayPoint
-        pStage[Quad.index_["p"]["size"]] = egoSize
-        pStage[Quad.index_["p"]["weights"], 0] = weightStage
+        pStage[Quad.index_["p"]["envDim"]] = np.array(envDim)
+        pStage[Quad.index_["p"]["startPos"]] = np.array(startPos)
+        pStage[Quad.index_["p"]["wayPoint"]] = np.array(wayPoint)
+        pStage[Quad.index_["p"]["size"]] = np.array(egoSize)
+        pStage[Quad.index_["p"]["weights"], 0] = np.array(weightStage)
         # obstacle information, including other quadrotors
         # and moving obstacles, set other quad first
         idx = 0
@@ -59,9 +59,9 @@ def setOnlineParameters_ray(Quad):
             if iQuad == Quad.id_:
                 continue
             else:
-                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = quadPath[:, iStage,iQuad:iQuad+1]
-                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = quadSize
-                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = quadColl
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = np.array(quadPath[:, iStage,iQuad:iQuad+1])
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = np.array(quadSize)
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = np.array(quadColl)
                 idx = idx + 1
 
         for jObs in range(Quad.nDynObs_):
@@ -76,7 +76,7 @@ def setOnlineParameters_ray(Quad):
 
         # insert into the all stage parameter
         mpc_pAll_[Quad.npar_ * iStage : Quad.npar_ * (iStage+1)] = pStage
-    return mpc_pAll_.copy()
+    return np.array(mpc_pAll_)
 
 
 class pyCDrone():
@@ -112,7 +112,7 @@ class pyCDrone():
         self.mpc_exitflag_ = None
         self.mpc_info_ = None
         self.mpc_Xk_ = None
-        self.mpc_ZK_ = None
+        self.mpc_Zk_ = None
         self.mpc_Zk2_ = None
         self.mpc_ZPlan_ = None
 
@@ -187,9 +187,9 @@ class pyCDrone():
         #always simulated
         assert self.cfg_["modeSim"] == 1
         # set estimated state the same as real one
-        self.pos_est_[:,:] = self.pos_real_
-        self.vel_est_[:,:] = self.vel_real_
-        self.euler_est_[:,:] = self.euler_real_
+        self.pos_est_ = np.array(self.pos_real_)
+        self.vel_est_ = np.array(self.vel_real_)
+        self.euler_est_ = np.array(self.euler_real_)
 
         # add noise if necessary ( NOT NECESSARY, only with chance constraints )
 
@@ -221,7 +221,7 @@ class pyCDrone():
 
         # all stage parameters
         pStage = np.zeros((self.npar_, 1))
-        self.mpc_pAll_ = matlib.repmat(pStage, self.N_, 1)
+        self.mpc_pAll_ = matlib.repmat(pStage, self.N_, 1).copy()
         for iStage in range(0,self.N_):
             #general parameter
             pStage[self.index_["p"]["envDim"]] = envDim
@@ -331,7 +331,7 @@ class pyCDrone():
 
         # transform u, check the using dynamics model before doing this!
         yaw = self.euler_est_[2]
-        self.u_body_ = self.u_mpc_
+        self.u_body_ = self.u_mpc_.copy()
         self.u_body_[0] = self.u_mpc_[1]*np.sin(yaw) + self.u_mpc_[0]*np.cos(yaw) #TODO: clarify with Hai
         self.u_body_[1] = self.u_mpc_[1]*np.cos(yaw) + self.u_mpc_[0]*np.sin(yaw) #u_mpc global --> here transform to local
                                                                             # this is only useful if performing real experiments
@@ -357,7 +357,7 @@ class pyCDrone():
         problem["xinit"] = self.mpc_Xk_.copy()
         problem["x0"] = x0_temp.copy()
 
-        return problem
+        return problem.copy()
 
 
     def solveMPC(self, problem): #Might be some issues with the shape of the vectors
@@ -415,8 +415,7 @@ class pyCDrone():
         yaw = self.euler_est_[2]
         self.u_body_ = self.u_mpc_
         self.u_body_[0] = self.u_mpc_[1] * np.sin(yaw) + self.u_mpc_[0] * np.cos(yaw)  # TODO: clarify with Hai
-        self.u_body_[1] = self.u_mpc_[1] * np.cos(yaw) + self.u_mpc_[0] * np.sin(
-            yaw)  # u_mpc global --> here transform to local
+        self.u_body_[1] = self.u_mpc_[1] * np.cos(yaw) + self.u_mpc_[0] * np.sin(yaw)  # u_mpc global --> here transform to local
         # this is only useful if performing real experiments
 
     def step(self):
@@ -433,9 +432,9 @@ class pyCDrone():
 
 
         #update the implicit real state
-        self.pos_real_[:,:] = xNext[self.index_["x"]["pos"]]
-        self.vel_real_[:,:] = xNext[self.index_["x"]["vel"]]
-        self.euler_real_[:,:] = xNext[self.index_["x"]["euler"]]
+        self.pos_real_[:,:] = xNext[self.index_["x"]["pos"]].copy()
+        self.vel_real_[:,:] = xNext[self.index_["x"]["vel"]].copy()
+        self.euler_real_[:,:] = xNext[self.index_["x"]["euler"]].copy()
 
     def propagateStateCov(self): # NOT NECESSARY, ONLY WHEN CONSIDERING CHANCE CONSTRAINTS
         #Propagate uncertainty covariance along the path
@@ -484,7 +483,7 @@ class pyCDrone():
 
     def predictPathConstantV(self):
         # Predict quad path based on constant velocity assumption
-        self.pred_path_[:,0:1] = self.pos_est_
+        self.pred_path_[:,0:1] = self.pos_est_.copy()
         self.pred_pathcov_[:, 1] = np.array([self.pos_est_cov_[0,0], self.pos_est_cov_[1,1],
                                              self.pos_est_cov_[2,2], self.pos_est_cov_[0,1],
                                              self.pos_est_cov_[1,2], self.pos_est_cov_[0,2]])
@@ -503,10 +502,10 @@ class pyCDrone():
         for iStage in range(1, self.N_):
             xpred = np.matmul(F,xpred)
             Ppred = np.matmul(F,np.matmul(Ppred,F.T))
-            self.pred_path_[:, iStage] = xpred[0:3, 0]
+            self.pred_path_[:, iStage] = xpred[0:3, 0].copy()
             self.pred_pathcov_[:, iStage] = np.array([Ppred[0,0],
                                                       Ppred[1,1],
                                                       Ppred[2,2],
                                                       Ppred[0,1],
                                                       Ppred[1,2],
-                                                      Ppred[0,2]])
+                                                      Ppred[0,2]]).copy()
