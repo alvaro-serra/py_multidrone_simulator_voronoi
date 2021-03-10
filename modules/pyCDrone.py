@@ -9,6 +9,21 @@ from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_p
 #from solvers.solver.basic.Basic_Forces_11_20_50 import FORCESNLPsolver_basic_11_20_50_py
 from integrators.RK2 import rk2a_onestep as RK2
 import ray
+import psutil
+import gc
+
+
+def auto_garbage_collect(pct=80.0):
+    """
+    auto_garbage_collection - Call the garbage collection if memory used is greater than 80% of total available memory.
+                              This is called to deal with an issue in Ray not freeing up used memory.
+
+        pct - Default value of 80%.  Amount of memory in use that triggers the garbage collection call.
+    """
+    if psutil.virtual_memory().percent >= pct:
+        gc.collect()
+    return
+
 
 @ray.remote
 def solveMPC_ray(all_parameters, xinit, x0): #Might be some issues with the shape of the vectors
@@ -21,6 +36,7 @@ def solveMPC_ray(all_parameters, xinit, x0): #Might be some issues with the shap
     OUTPUT, EXITFLAG, INFO = solver(problem)
     #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
     #print("Solving time drone:",time.time()-aux1)
+    #auto_garbage_collect(35.0)
     return [OUTPUT, EXITFLAG, INFO]
 
 @ray.remote
@@ -76,6 +92,8 @@ def setOnlineParameters_ray(Quad):
 
         # insert into the all stage parameter
         mpc_pAll_[Quad.npar_ * iStage : Quad.npar_ * (iStage+1)] = pStage
+
+    #auto_garbage_collect(35.0)
     return mpc_pAll_
 
 
