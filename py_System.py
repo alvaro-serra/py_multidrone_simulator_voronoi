@@ -6,6 +6,8 @@ from modules.pyCSystem import pyCSystem
 from scenarios.scenarios import scn_circle
 
 import ray
+import psutil
+import gc
 
 
 # Problem setup for basic mav collision avoidance
@@ -267,11 +269,23 @@ def norm_collision_check(quad_mat, quad1, quad2):
     normdist = np.sqrt(dif[0] ** 2 / 0.6 ** 2 + dif[1] ** 2 / 0.6 ** 2 + dif[2] ** 2)
     return True if normdist <= 0.99 else False
 
+def auto_garbage_collect(pct=80.0):
+    """
+    auto_garbage_collection - Call the garbage collection if memory used is greater than 80% of total available memory.
+                              This is called to deal with an issue in Ray not freeing up used memory.
+
+        pct - Default value of 80%.  Amount of memory in use that triggers the garbage collection call.
+    """
+    if psutil.virtual_memory().percent >= pct:
+        gc.collect()
+    return
+
 
 if __name__ == '__main__':
 
     nQuad = 12
     nDynObs = 0
+    n_episodes = 10
     ray.init(local_mode=False, log_to_driver=False)
     System = createMultiDroneSystem(nQuad=nQuad, nDynObs=nDynObs)
     # (i, j) --> robot i requests from robot j its traj. intention
@@ -282,17 +296,22 @@ if __name__ == '__main__':
 
     collisions = 0
     aux2 = time.time()
-    for i in range(100):
+    for i in range(100*n_episodes):
         print("step:",i)
         aux1 = time.time()
         obs = System.stepMultiAgent(sent_action)
         n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
         #n_action = np.zeros((nQuad, nQuad))
         #n_action[1, 1] = -1
+
+        if i%100 == 99:
+            n_action[0, 0] = -1
+
         sent_action = n_action.flatten()
         aux = np.array(obs).reshape(nQuad,13)
         mat_info_array = list(aux[:, 0:13])
 
+        """
         # collision check
         for iQuad1 in range(nQuad):
             for iQuad2 in range(nQuad):
@@ -301,11 +320,12 @@ if __name__ == '__main__':
                 if norm_collision_check(mat_info_array, iQuad1, iQuad2):
                     collisions += 0.5
             print("distance to goal:", dist2goal(mat_info_array, iQuad1))
-
-
+        """
         print("step time:", time.time() - aux1)
+        print("memory being used:", psutil.virtual_memory().percent)
+        #auto_garbage_collect(35.0)
 
-    print("collisions:",collisions) # demasiadas colisiones cuando hay full communication. Darle una ultima mañana
+    print("collisions:",collisions)
 
     print("time:", time.time() - aux2)
     print("everything's over")

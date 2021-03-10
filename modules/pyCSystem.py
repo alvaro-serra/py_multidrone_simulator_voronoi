@@ -1,6 +1,7 @@
 
 import numpy as np
 import numpy.matlib as matlib
+from joblib import Parallel, delayed
 
 from modules.pyCDrone import pyCDrone, solveMPC_ray, setOnlineParameters_ray
 from scenarios.scenarios import scn_circle_random, scn_circle, scn_random
@@ -11,7 +12,7 @@ import time
 from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_py import FORCESNLPsolver_basic_11_20_50_solve as solver
 
 
-"""
+#"""
 def solveMPC(all_parameters, xinit, x0): #Might be some issues with the shape of the vectors
     # call the NLP solver
     #aux1 = time.time()
@@ -23,8 +24,62 @@ def solveMPC(all_parameters, xinit, x0): #Might be some issues with the shape of
     #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
     #print("Solving time drone:",time.time()-aux1)
     return [OUTPUT.copy(), EXITFLAG, INFO]
-"""
+#"""
+#"""
+def setOnlineParameters(Quad):
+    # Set the real-time parameter vector
+    # pAll include parameters for all N stage
 
+    # prepare parameters
+    envDim = Quad.cfg_["ws"]
+    startPos = np.concatenate([Quad.pos_est_, np.array([Quad.euler_est_[2]])], 0)
+    wayPoint = Quad.quad_goal_
+    egoSize = Quad.size_
+    weightStage = Quad.mpc_weights_[:,0]
+    weightN = Quad.mpc_weights_[:,1]
+    quadSize = Quad.cfg_["quad"]["size"]
+    obsSize = Quad.cfg_["obs"]["size"]
+    quadColl = Quad.mpc_coll_[0:2,0:1] #lambda, buffer (sigmoid function)
+    obsColl = Quad.mpc_coll_[0:2,1:2] #lambda, buffer
+    quadPath = Quad.quad_path_
+    obsPath = Quad.obs_path_
+
+    # all stage parameters
+    pStage = np.zeros((Quad.npar_, 1))
+    mpc_pAll_ = matlib.repmat(pStage, Quad.N_, 1)
+    for iStage in range(0,Quad.N_):
+        #general parameter
+        pStage[Quad.index_["p"]["envDim"]] = envDim
+        pStage[Quad.index_["p"]["startPos"]] = startPos
+        pStage[Quad.index_["p"]["wayPoint"]] = wayPoint
+        pStage[Quad.index_["p"]["size"]] = egoSize
+        pStage[Quad.index_["p"]["weights"], 0] = weightStage
+        # obstacle information, including other quadrotors
+        # and moving obstacles, set other quad first
+        idx = 0
+        for iQuad in range(Quad.nQuad_):
+            if iQuad == Quad.id_:
+                continue
+            else:
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = quadPath[:, iStage,iQuad:iQuad+1]
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = quadSize
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = quadColl
+                idx = idx + 1
+
+        for jObs in range(Quad.nDynObs_):
+            pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"],idx]] = obsPath[:, iStage, jObs:jObs+1]
+            pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = obsSize
+            pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = obsColl
+            idx = idx + 1
+
+        # change the last stage cost term weights
+        if iStage == Quad.N_-1:
+            pStage[Quad.index_["p"]["weights"], 0] = weightN
+
+        # insert into the all stage parameter
+        mpc_pAll_[Quad.npar_ * iStage : Quad.npar_ * (iStage+1)] = pStage
+    return mpc_pAll_
+#"""
 
 
 class pyCSystem():
@@ -127,10 +182,29 @@ class pyCSystem():
 
         #print("             exchange of information from central to drones:", time.time() - aux1)
 
-        ##### parallelized part #####
+        ###################
+        ### Parallelize ###
+        ###################
+        parallelization = "ray"  # ray / joblib / "none" # parallelization disabled until we find and solve the
+                                                            # cause of the memory leak
         #aux1 = time.time()
-        refs_setop = [setOnlineParameters_ray.remote(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
-        multiquad_mpc_pAll_ = ray.get(refs_setop)
+
+        if parallelization == "none":
+            multiquad_mpc_pAll_ = [setOnlineParameters(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
+
+        elif parallelization == "ray":
+            refs_setop = [setOnlineParameters_ray.remote(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
+            multiquad_mpc_pAll_ = ray.get(refs_setop)
+
+            # Quad_ids = [ray.put(Quad) for Quad in self.MultiQuad_]
+            # refs_setop = [setOnlineParameters_ray.remote(Quad_id) for Quad_id in Quad_ids]
+
+        elif parallelization == "joblib":
+            multiquad_mpc_pAll_ = Parallel(n_jobs=-1)(delayed(setOnlineParameters)(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_))
+
+
+        ###################
+
         for iQuad in range(self.nQuad_):
             # set online parameters for the MPC
             self.MultiQuad_[iQuad].mpc_pAll_ = multiquad_mpc_pAll_[iQuad]
@@ -143,10 +217,20 @@ class pyCSystem():
         #print("             pre mpc:", time.time() - aux1)
 
         #aux1 = time.time()
-        #results = [solveMPC(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
-        refs = [solveMPC_ray.remote(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
-        results = ray.get(refs)
 
+        ###################
+        ### Parallelize ###
+        ###################
+        if parallelization == "none":
+            results = [solveMPC(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
+
+        elif parallelization == "ray":
+            refs = [solveMPC_ray.remote(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
+            results = ray.get(refs)
+
+        elif parallelization == "joblib":
+            results = Parallel(n_jobs=-1)(delayed(solveMPC)(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems)
+        ###################
         #print("             solving mpc:", time.time() - aux1)
 
         #aux1 = time.time()
