@@ -29,10 +29,13 @@ def auto_garbage_collect(pct=80.0):
 def solveMPC_ray(all_parameters, xinit, x0): #Might be some issues with the shape of the vectors
     # call the NLP solver
     #aux1 = time.time()
+    all_parameters = np.array(all_parameters)
+    xinit = np.array(xinit)
+    x0 = np.array(x0)
     problem = {}
-    problem['all_parameters'] = np.array(all_parameters)
-    problem['xinit'] = np.array(xinit)
-    problem['x0'] = np.array(x0)
+    problem['all_parameters'] = all_parameters
+    problem['xinit'] = xinit
+    problem['x0'] = x0
     OUTPUT, EXITFLAG, INFO = solver(problem)
     #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
     #print("Solving time drone:",time.time()-aux1)

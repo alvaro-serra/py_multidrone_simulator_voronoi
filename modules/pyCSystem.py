@@ -185,7 +185,7 @@ class pyCSystem():
         ###################
         ### Parallelize ###
         ###################
-        parallelization = "ray"  # ray / joblib / "none" # parallelization disabled until we find and solve the
+        parallelization = "none"  # ray / joblib / "none" # parallelization disabled until we find and solve the
                                                             # cause of the memory leak
         #aux1 = time.time()
 
