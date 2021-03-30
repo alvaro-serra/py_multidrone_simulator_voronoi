@@ -285,18 +285,22 @@ if __name__ == '__main__':
 
     nQuad = 12
     nDynObs = 0
-    n_episodes = 10
+    n_episodes = 100
     ray.init(local_mode=False, log_to_driver=False)
     System = createMultiDroneSystem(nQuad=nQuad, nDynObs=nDynObs)
     # (i, j) --> robot i requests from robot j its traj. intention
     n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
     #n_action = np.zeros((nQuad,nQuad))
-    n_action[0,0] = -1
+    n_action[0,0] = -5
     sent_action = n_action.flatten()
 
     collisions = 0
     aux2 = time.time()
+    episode = 1
+    success_rate = 0
+    collision_bool = 0
     for i in range(100*n_episodes):
+        print("episode:", episode)
         print("step:",i)
         aux1 = time.time()
         obs = System.stepMultiAgent(sent_action)
@@ -305,28 +309,31 @@ if __name__ == '__main__':
         #n_action[1, 1] = -1
 
         if i%100 == 99:
-            n_action[0, 0] = -1
+            n_action[0, 0] = -5
+            success_rate += 1-collision_bool
+            collision_bool = 0
+            episode += 1
 
         sent_action = n_action.flatten()
         aux = np.array(obs).reshape(nQuad,13)
         mat_info_array = list(aux[:, 0:13])
 
-        """
+
         # collision check
         for iQuad1 in range(nQuad):
             for iQuad2 in range(nQuad):
                 if iQuad1 == iQuad2:
                     continue
                 if norm_collision_check(mat_info_array, iQuad1, iQuad2):
+                    collision_bool = 1
                     collisions += 0.5
-            print("distance to goal:", dist2goal(mat_info_array, iQuad1))
-        """
+            #print("distance to goal:", dist2goal(mat_info_array, iQuad1))
         print("step time:", time.time() - aux1)
         print("memory being used:", psutil.virtual_memory().percent)
         #auto_garbage_collect(35.0)
 
     print("collisions:",collisions)
-
+    print("success rate:", success_rate)
     print("time:", time.time() - aux2)
     print("everything's over")
     ray.shutdown()

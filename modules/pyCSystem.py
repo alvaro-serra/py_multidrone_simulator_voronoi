@@ -325,6 +325,8 @@ class pyCSystem():
             self.rotateScenario()
         elif self.multi_quad_comm_mtx_[0, 0] == -5:
             self.circleRandomScenario()
+        elif self.multi_quad_comm_mtx_[0, 0] == -6:
+            self.groupScenario()
         #print("reset scenario:", time.time() - aux1)
 
         #aux1 = time.time()
@@ -416,9 +418,6 @@ class pyCSystem():
             self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
             self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
-            # goal
-            self.multi_quad_goal_[:, iQuad] = self.cfg_["quadEndPos"][:, iQuad]
-
             # for mpc
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
                                       self.MultiQuad_[iQuad].euler_real_], axis=0)
@@ -467,9 +466,6 @@ class pyCSystem():
             self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
             self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
 
-            # goal
-            self.multi_quad_goal_[:, iQuad] = self.cfg_["quadEndPos"][:, iQuad]
-
             # for mpc
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
                                       self.MultiQuad_[iQuad].euler_real_], axis=0)
@@ -493,9 +489,9 @@ class pyCSystem():
         num_pair = int(np.floor(self.nQuad_/2))  # number of pairs
         rand_idx = np.random.permutation(self.nQuad_)  # randomize index
 
-        for iPair in range(num_pair):
-            self.multi_quad_goal_[:, rand_idx[2*iPair-1]] = quadStartPos[:, rand_idx[2*iPair]]
-            self.multi_quad_goal_[:, rand_idx[2*iPair]] = quadStartPos[:, rand_idx[2*iPair-1]]
+        for iPair in range(num_pair): # 0/1, 2/3,...
+            self.multi_quad_goal_[:, rand_idx[2*iPair]] = quadStartPos[:, rand_idx[2*iPair+1]]
+            self.multi_quad_goal_[:, rand_idx[2*iPair+1]] = quadStartPos[:, rand_idx[2*iPair]]
 
         self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
         # self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
@@ -578,6 +574,58 @@ class pyCSystem():
 
             # goal
             self.multi_quad_goal_[:, iQuad] = quadEndPos[:, rand_idx[iQuad]]
+
+            # for mpc
+            x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
+                                      self.MultiQuad_[iQuad].euler_real_], axis=0)
+            z_start = np.zeros((self.model_["nvar"], 1))
+            z_start[self.index_["z"]["pos"] + self.index_["z"]["vel"] + self.index_["z"]["euler"]] = x_start
+            mpc_plan = matlib.repmat(z_start, 1, self.model_["N"])
+            # initialize MPC
+            self.MultiQuad_[iQuad].initializeMPC(x_start, mpc_plan)
+            # reset belief of other quad trajectories
+            for iStage in range(self.model_["N"]):
+                self.multi_quad_mpc_path_[:, iStage, iQuad] = self.cfg_["quadStartPos"][0:3, rand_idx[iQuad]]
+                # .multi_quad_mpc_pathcov_ = np.array([[self.cfg_["quad"]["noise"]["pos"][0, 0]], # TODO useful for chance ctraints, specify in cfg
+                #                                         [self.cfg_["quad"]["noise"]["pos"][1, 1]],
+                #                                         [self.cfg_["quad"]["noise"]["pos"][2, 2]],
+                #                                         [self.cfg_["quad"]["noise"]["pos"][0, 1]],
+                #                                         [self.cfg_["quad"]["noise"]["pos"][1, 2]],
+                #                                         [self.cfg_["quad"]["noise"]["pos"][0, 2]]])
+
+        self.multi_quad_prep_path_[:,:,:] = self.multi_quad_mpc_path_
+        # self.multi_quad_prep_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
+        self.multi_quad_coor_path_[:,:,:] = self.multi_quad_mpc_path_
+        # self.multi_quad_coor_pathcov_ = self.multi_quad_mpc_pathcov_ # Same as before
+
+
+
+    def groupScenario(self):
+        # group swapping scenario, drones are split into two groups and must swap with its symmetrical opposite
+        # drones index is randomized
+
+        xDim = np.array([-self.cfg_["ws"][0]+self.cfg_["quad"]["size"][0], self.cfg_["ws"][0]-self.cfg_["quad"]["size"][0]])
+        yDim = np.array(
+            [-self.cfg_["ws"][1] + self.cfg_["quad"]["size"][1], self.cfg_["ws"][1] - self.cfg_["quad"]["size"][1]])
+        zDim = np.array(
+            [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]])
+
+        quadStartPos, quadStartVel, quadEndPos = scn_random(self.nQuad_, xDim, yDim, zDim)
+
+        self.multi_quad_goal_[:,:] = quadEndPos
+
+
+        rand_idx = np.random.permutation(self.nQuad_)  # randomize index
+        for iQuad in range(self.nQuad_):
+            # initial state
+            self.MultiQuad_[iQuad].pos_real_[0:3,0] = quadStartPos[0:3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].vel_real_[0:3,0] = quadStartVel[0:3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].euler_real_[0:3] = np.zeros((3, 1))
+            self.MultiQuad_[iQuad].euler_real_[2] = quadStartPos[3, rand_idx[iQuad]]
+            self.MultiQuad_[iQuad].pos_est_[:,:] = self.MultiQuad_[iQuad].pos_real_
+            self.MultiQuad_[iQuad].vel_est_[:,:] = self.MultiQuad_[iQuad].vel_real_
+            self.MultiQuad_[iQuad].euler_est_[:,:] = self.MultiQuad_[iQuad].euler_real_
+
 
             # for mpc
             x_start = np.concatenate([self.MultiQuad_[iQuad].pos_real_, self.MultiQuad_[iQuad].vel_real_,
