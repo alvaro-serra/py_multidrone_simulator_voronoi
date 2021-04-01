@@ -258,7 +258,7 @@ class pyCDrone():
         # transform u, check the using dynamics model before doing this!
         yaw = self.euler_est_[2]
         self.u_body_ = self.u_mpc_
-        self.u_body_[0] = self.u_mpc_[1]*np.sin(yaw) + self.u_mpc_[0]*np.cos(yaw) #TODO: clarify with Hai
+        self.u_body_[0] = self.u_mpc_[1]*np.sin(yaw) + self.u_mpc_[0]*np.cos(yaw) #TODO: clarify with Hai DONE
         self.u_body_[1] = self.u_mpc_[1]*np.cos(yaw) + self.u_mpc_[0]*np.sin(yaw) #u_mpc global --> here transform to local
                                                                             # this is only useful if performing real experiments
 
