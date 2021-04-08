@@ -4,7 +4,7 @@ import numpy.matlib as matlib
 from joblib import Parallel, delayed
 
 from modules.pyCDrone import pyCDrone, solveMPC_ray, setOnlineParameters_ray
-from scenarios.scenarios import scn_circle_random, scn_circle, scn_random
+from scenarios.scenarios import scn_circle_random, scn_circle, scn_random, scn_group_swap
 from utils.utils import predictQuadPathFromCom, predictStateConstantV
 import ray
 import time
@@ -610,12 +610,13 @@ class pyCSystem():
         zDim = np.array(
             [self.cfg_["quad"]["size"][2], self.cfg_["ws"][2] - self.cfg_["quad"]["size"][2]])
 
-        quadStartPos, quadStartVel, quadEndPos = scn_random(self.nQuad_, xDim, yDim, zDim)
+        quadStartPos, quadStartVel, quadEndPos = scn_group_swap(self.nQuad_, xDim, yDim, zDim)
 
         self.multi_quad_goal_[:,:] = quadEndPos
 
 
-        rand_idx = np.random.permutation(self.nQuad_)  # randomize index
+        #rand_idx = np.random.permutation(self.nQuad_)  # randomize index
+        rand_idx = np.arange(self.nQuad_)
         for iQuad in range(self.nQuad_):
             # initial state
             self.MultiQuad_[iQuad].pos_real_[0:3,0] = quadStartPos[0:3, rand_idx[iQuad]]

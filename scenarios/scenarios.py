@@ -125,31 +125,29 @@ def scn_group_swap(nQuad, xDim, yDim, zDim):
     zN = int(np.floor(zL/0.6))
 
     #non-repeating integer sequence
-    xidx_rand = np.random.permutation(xN)+1
-    yidx_rand = np.random.permutation(yN)+1
+    #xidx_rand = np.random.permutation(xN)+1
+    #yidx_rand = np.random.permutation(yN)+1
 
     #define first set of initial positions
     pos_increment = [[2,0],[2,2],[2,-2]]
-    xcenter = xN/2
-    ycenter = yN / 2
-    for iQuad in range(nQuad/2):
+    for iQuad in range(int(nQuad/2)):
         # Drone group 1
-        positionx = pos_increment[nQuad%3][0]*(1+nQuad/3)
-        positiony = pos_increment[nQuad%3][1]
-        quadStartPos[0, iQuad] = xDim[0] + resolution * (xcenter+positionx)
-        quadStartPos[1, iQuad] = yDim[0] + resolution * (ycenter+positiony)
+        positionx = pos_increment[iQuad%3][0]*(1+int(iQuad/3))
+        positiony = pos_increment[iQuad%3][1]
+        quadStartPos[0, iQuad] = resolution * (positionx)
+        quadStartPos[1, iQuad] = resolution * (positiony)
         quadStartPos[2, iQuad] = 1.6  # flying height
-        quadEndPos[0, iQuad] = -quadStartPos[0, iQuad]
-        quadEndPos[1, iQuad] = quadStartPos[1, iQuad]
-        quadEndPos[2, iQuad] = quadStartPos[2, iQuad]
+        quadEndPos[0, iQuad] = -quadStartPos[0, iQuad].copy()
+        quadEndPos[1, iQuad] = quadStartPos[1, iQuad].copy()
+        quadEndPos[2, iQuad] = quadStartPos[2, iQuad].copy()
 
         # Drone group 2
-        quadStartPos[0, nQuad/2 + iQuad] = quadEndPos[0, iQuad]
-        quadStartPos[1, nQuad/2 + iQuad] = quadEndPos[1, iQuad]
-        quadStartPos[2, nQuad/2 + iQuad] = quadEndPos[2, iQuad]
-        quadEndPos[0, nQuad/2 + iQuad] = -quadStartPos[0, nQuad/2 + iQuad]
-        quadEndPos[1, nQuad/2 + iQuad] = quadStartPos[1, nQuad/2 + iQuad]
-        quadEndPos[2, nQuad/2 + iQuad] = quadStartPos[2, nQuad/2 + iQuad]
+        quadStartPos[0, int(nQuad/2 + iQuad)] = quadEndPos[0, iQuad].copy()
+        quadStartPos[1, int(nQuad/2 + iQuad)] = quadEndPos[1, iQuad].copy()
+        quadStartPos[2, int(nQuad/2 + iQuad)] = quadEndPos[2, iQuad].copy()
+        quadEndPos[0, int(nQuad/2 + iQuad)] = -quadStartPos[0, int(nQuad/2 + iQuad)].copy()
+        quadEndPos[1, int(nQuad/2 + iQuad)] = quadStartPos[1, int(nQuad/2 + iQuad)].copy()
+        quadEndPos[2, int(nQuad/2 + iQuad)] = quadStartPos[2, int(nQuad/2 + iQuad)].copy()
 
 
     return quadStartPos, quadStartVel, quadEndPos
