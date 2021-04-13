@@ -283,7 +283,7 @@ def auto_garbage_collect(pct=80.0):
 
 if __name__ == '__main__':
 
-    nQuad = 12
+    nQuad = 18
     nDynObs = 0
     n_episodes = 1
     ray.init(local_mode=False, log_to_driver=False)
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     scenario = -1
     n_action[0,0] = scenario
     sent_action = n_action.flatten()
-    n_timesteps = 150
+    n_timesteps = 100
 
     collisions = 0
     aux2 = time.time()
@@ -327,6 +327,7 @@ if __name__ == '__main__':
                 if iQuad1 == iQuad2:
                     continue
                 if norm_collision_check(mat_info_array, iQuad1, iQuad2):
+                    print('COLLISION!!')
                     collision_bool = 1
                     collisions += 0.5
             print("distance to goal:", dist2goal(mat_info_array, iQuad1))

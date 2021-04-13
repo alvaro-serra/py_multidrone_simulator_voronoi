@@ -44,12 +44,24 @@ def scn_random(nQuad, xDim, yDim, zDim):
     #non-repeating integer sequence
     xidx_rand = np.random.permutation(xN)+1
     yidx_rand = np.random.permutation(yN)+1
+    check_array = []
 
     # random starting and end pos
     for iQuad in range(nQuad):
-        xN_i = xidx_rand[iQuad]
-        yN_i = yidx_rand[iQuad]
-        zN_i = np.random.randint(zN-1)+1
+        if nQuad<=19:
+            xN_i = xidx_rand[iQuad]
+            yN_i = yidx_rand[iQuad]
+            zN_i = np.random.randint(zN-1)+1
+        else:
+            empty_space = False
+            while not empty_space:
+                xN_i = np.random.randint(xN - 1) + 1
+                yN_i = np.random.randint(yN - 1) + 1
+                zN_i = np.random.randint(zN - 1) + 1
+                if [xN_i, yN_i, zN_i] not in check_array:
+                    check_array.append([xN_i, yN_i, zN_i])
+                    empty_space = True
+
         quadStartPos[0, iQuad] = xDim[0] + resolution*xN_i
         quadStartPos[1, iQuad] = yDim[0] + resolution*yN_i
         quadStartPos[2, iQuad] = zDim[0] + resolution*zN_i
@@ -61,9 +73,19 @@ def scn_random(nQuad, xDim, yDim, zDim):
 
     # random starting and end pos
     for iQuad in range(nQuad):
-        xN_i = xidx_rand[iQuad]
-        yN_i = yidx_rand[iQuad]
-        zN_i = np.random.randint(zN-1)+1
+        if nQuad <= 19:
+            xN_i = xidx_rand[iQuad]
+            yN_i = yidx_rand[iQuad]
+            zN_i = np.random.randint(zN - 1) + 1
+        else:
+            empty_space = False
+            while not empty_space:
+                xN_i = np.random.randint(xN - 1) + 1
+                yN_i = np.random.randint(yN - 1) + 1
+                zN_i = np.random.randint(zN - 1) + 1
+                if [xN_i, yN_i, zN_i] not in check_array:
+                    check_array.append([xN_i, yN_i, zN_i])
+                    empty_space = True
 
         quadEndPos[0, iQuad] = xDim[0] + resolution*xN_i
         quadEndPos[1, iQuad] = yDim[0] + resolution*yN_i

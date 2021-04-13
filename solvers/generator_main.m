@@ -10,7 +10,7 @@ clc
 
 
 %% Initialization
-nQuad   = 12;            % number of quadrotors
+nQuad   = 18;            % number of quadrotors
 nDynObs = 0;            % number of moving obstacles
 srv_idx = 2;            % idx of the service
 initialize_func;

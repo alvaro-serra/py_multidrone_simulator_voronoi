@@ -9,18 +9,29 @@ from utils.utils import predictQuadPathFromCom, predictStateConstantV
 import ray
 import time
 
+from solvers.solver.basic.Basic_Forces_5_20_50.FORCESNLPsolver_basic_5_20_50_py import FORCESNLPsolver_basic_5_20_50_solve as solver06
 from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_py import FORCESNLPsolver_basic_11_20_50_solve as solver
+from solvers.solver.basic.Basic_Forces_17_20_50.FORCESNLPsolver_basic_17_20_50_py import FORCESNLPsolver_basic_17_20_50_solve as solver18
+from solvers.solver.basic.Basic_Forces_23_20_50.FORCESNLPsolver_basic_23_20_50_py import FORCESNLPsolver_basic_23_20_50_solve as solver24
 
 
 #"""
-def solveMPC(all_parameters, xinit, x0): #Might be some issues with the shape of the vectors
+def solveMPC(all_parameters, xinit, x0, nQuad = 12): #Might be some issues with the shape of the vectors
     # call the NLP solver
+    assert nQuad == 12 or nQuad == 24 or nQuad == 6 or nQuad == 18
     #aux1 = time.time()
     problem = {}
     problem['all_parameters'] = all_parameters
     problem['xinit'] = xinit
     problem['x0'] = x0
-    OUTPUT, EXITFLAG, INFO = solver(problem)
+    if nQuad == 12:
+        OUTPUT, EXITFLAG, INFO = solver(problem)
+    elif nQuad == 24:
+        OUTPUT, EXITFLAG, INFO = solver24(problem)
+    elif nQuad == 6:
+        OUTPUT, EXITFLAG, INFO = solver06(problem)
+    elif nQuad == 18:
+        OUTPUT, EXITFLAG, INFO = solver18(problem)
     #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
     #print("Solving time drone:",time.time()-aux1)
     return [OUTPUT.copy(), EXITFLAG, INFO]
@@ -222,14 +233,14 @@ class pyCSystem():
         ### Parallelize ###
         ###################
         if parallelization == "none":
-            results = [solveMPC(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
+            results = [solveMPC(problem['all_parameters'], problem["xinit"], problem['x0'], nQuad = self.nQuad_) for problem in problems]
 
         elif parallelization == "ray":
-            refs = [solveMPC_ray.remote(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems]
+            refs = [solveMPC_ray.remote(problem['all_parameters'], problem["xinit"], problem['x0'], nQuad = self.nQuad_) for problem in problems]
             results = ray.get(refs)
 
         elif parallelization == "joblib":
-            results = Parallel(n_jobs=-1)(delayed(solveMPC)(problem['all_parameters'], problem["xinit"], problem['x0']) for problem in problems)
+            results = Parallel(n_jobs=-1)(delayed(solveMPC)(problem['all_parameters'], problem["xinit"], problem['x0'], nQuad = self.nQuad_) for problem in problems)
         ###################
         #print("             solving mpc:", time.time() - aux1)
 
