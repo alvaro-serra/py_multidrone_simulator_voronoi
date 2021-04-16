@@ -4,6 +4,7 @@ import numpy.matlib as matlib
 from joblib import Parallel, delayed
 
 from modules.pyCDrone import pyCDrone, solveMPC_ray, setOnlineParameters_ray
+from modules.pyCDynObs import pyCDynObs
 from scenarios.scenarios import scn_circle_random, scn_circle, scn_random, scn_group_swap
 from utils.utils import predictQuadPathFromCom, predictStateConstantV
 import ray
@@ -113,7 +114,7 @@ class pyCSystem():
         self.MultiQuad_ = [pyCDrone(iQuad, iQuad, cfg, pr, model, index) for iQuad in range(nQuad)]
 
         self.MultiDynObs_ = []
-        #self.MultiDynObs_ = [pyCDynObs(jObs, cfg, pr, model, index) for jObs in range(nDynObs)] # TODO code pyCDynObs
+        self.MultiDynObs_ = [pyCDynObs(jObs, cfg, pr, model, index) for jObs in range(nDynObs)] #
 
         self.GraphicCom_ = None
         #self.GraphicCom_ = pyCGraphicCom(true, cfg, nQuad, nDynObs, model["N"]) # TODO pyCGraphycCom

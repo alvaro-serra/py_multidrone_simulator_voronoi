@@ -236,7 +236,14 @@ def createMultiDroneSystem(nQuad = 12, nDynObs = 0):
     System.multi_quad_coor_pathcov_[:,:,:] = System.multi_quad_mpc_pathcov_
 
 
-    # TODO Set moving obstacle objects in simulation mode --> UNNECESSARY (no moving obstacles other than drones)
+    # TODO Set moving obstacle objects in simulation mode --> used in information gathering settings.
+    if cfg["modeSim"] == 1:
+        for jObs in range(model["nDynObs"]):
+            #System.MultiDynObs_[jObs].initializeROS()
+            System.MultiDynObs_[jObs].initializeState(np.zeros((3,1)), np.zeros((3,1)),cfg['obs']['noise']['pos'],cfg['obs']['noise']['vel'])
+            System.MultiDynObs_[jObs].randomState()
+
+
 
     # TODO:Initialization graphic communicator
     # initialize ROS
@@ -283,7 +290,7 @@ def auto_garbage_collect(pct=80.0):
 
 if __name__ == '__main__':
 
-    nQuad = 18
+    nQuad = 12
     nDynObs = 0
     n_episodes = 1
     ray.init(local_mode=False, log_to_driver=False)
