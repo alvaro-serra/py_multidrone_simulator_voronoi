@@ -298,7 +298,7 @@ if __name__ == '__main__':
     # (i, j) --> robot i requests from robot j its traj. intention
     n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
     #n_action = np.zeros((nQuad,nQuad))
-    scenario = -1
+    scenario = -5
     n_action[0,0] = scenario
     sent_action = n_action.flatten()
     n_timesteps = 100

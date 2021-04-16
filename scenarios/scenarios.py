@@ -105,13 +105,23 @@ def scn_circle_random(nQuad, R_min, R_max):
     angle = 2.0*np.pi / nQuad
     ang_gap = 0.45*angle
 
+    auxPositions = []
     for iQuad in range(nQuad):
         #initial
-        angle_c = np.deg2rad(0) + angle*(iQuad-1)
-        angle_min = angle_c - ang_gap
-        angle_max = angle_c + ang_gap
-        angle_i = angle_min + (angle_max - angle_min)*np.random.random()
-        R_i = R_min + (R_max - R_min)*np.random.random()
+        possiblePositioning = False
+        #previousPositions = quadStartPos[0:2,0:iQuad]
+        while not possiblePositioning:
+            angle_c = np.deg2rad(0) + angle*(iQuad-1)
+            angle_min = angle_c - ang_gap
+            angle_max = angle_c + ang_gap
+            angle_i = angle_min + (angle_max - angle_min)*np.random.random()
+            R_i = R_min + (R_max - R_min)*np.random.random()
+            distances = np.linalg.norm(quadStartPos[0:2,0:iQuad] - np.array([[R_i*np.cos(angle_i), R_i*np.sin(angle_i)]]).T, axis = 0)
+            if np.all(distances > 0.6):
+                possiblePositioning = True
+
+
+
         quadStartPos[0:2, iQuad] = np.array([R_i*np.cos(angle_i), R_i*np.sin(angle_i)])
         quadStartPos[2, iQuad] = 1.6 # flying height
         quadStartPos[3, iQuad] = np.deg2rad(0) # yaw
