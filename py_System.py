@@ -290,7 +290,7 @@ def auto_garbage_collect(pct=80.0):
 
 if __name__ == '__main__':
 
-    nQuad = 12
+    nQuad = 24
     nDynObs = 0
     n_episodes = 1
     ray.init(local_mode=False, log_to_driver=False)
@@ -298,7 +298,7 @@ if __name__ == '__main__':
     # (i, j) --> robot i requests from robot j its traj. intention
     n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
     #n_action = np.zeros((nQuad,nQuad))
-    scenario = -1
+    scenario = -2
     n_action[0,0] = scenario
     sent_action = n_action.flatten()
     n_timesteps = 100

@@ -64,8 +64,10 @@ def scn_random(nQuad, xDim, yDim, zDim):
                 posx = xDim[0] + 0.31 + (xL - 0.31)* np.random.rand()
                 posy = yDim[0] + 0.31 + (yL - 0.31)* np.random.rand()
                 posz = zDim[0] + 0.31 + (zL - 0.31)* np.random.rand()
-                distances = np.linalg.norm(quadStartPos[0:3, 0:iQuad] - np.array([[posx, posy, posz]]).T, axis=0)
-                if np.all(distances > 0.6):
+                mock_position = np.array([posx, posy, posz])
+                dif = quadStartPos[0:3, 0:iQuad] - mock_position
+                normdistances = np.sqrt(dif[0,:] ** 2 / 0.6 ** 2 + dif[1,:] ** 2 / 0.6 ** 2 + dif[2,:] ** 2)
+                if np.all(normdistances > 0.99):
                     quadStartPos[0, iQuad] = posx
                     quadStartPos[1, iQuad] = posy
                     quadStartPos[2, iQuad] = posz
@@ -94,11 +96,13 @@ def scn_random(nQuad, xDim, yDim, zDim):
                 posx = xDim[0] + 0.31 + (xL - 0.31) * np.random.rand()
                 posy = yDim[0] + 0.31 + (yL - 0.31) * np.random.rand()
                 posz = zDim[0] + 0.31 + (zL - 0.31) * np.random.rand()
-                distances = np.linalg.norm(quadStartPos[0:3, 0:iQuad] - np.array([[posx, posy, posz]]).T, axis=0)
-                if np.all(distances > 0.6):
-                    quadStartPos[0, iQuad] = posx
-                    quadStartPos[1, iQuad] = posy
-                    quadStartPos[2, iQuad] = posz
+                mock_position = np.array([posx, posy, posz])
+                dif = quadStartPos[0:3, 0:iQuad] - mock_position
+                normdistances = np.sqrt(dif[0, :] ** 2 / 0.6 ** 2 + dif[1, :] ** 2 / 0.6 ** 2 + dif[2, :] ** 2)
+                if np.all(normdistances > 0.99):
+                    quadEndPos[0, iQuad] = posx
+                    quadEndPos[1, iQuad] = posy
+                    quadEndPos[2, iQuad] = posz
                     possiblePositioning = True
 
         # quadEndPos[2, iQuad] = 2.0
