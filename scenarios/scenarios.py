@@ -52,19 +52,24 @@ def scn_random(nQuad, xDim, yDim, zDim):
             xN_i = xidx_rand[iQuad]
             yN_i = yidx_rand[iQuad]
             zN_i = np.random.randint(zN-1)+1
+            quadStartPos[0, iQuad] = xDim[0] + resolution * xN_i
+            quadStartPos[1, iQuad] = yDim[0] + resolution * yN_i
+            quadStartPos[2, iQuad] = zDim[0] + resolution * zN_i
         else:
-            empty_space = False
-            while not empty_space:
-                xN_i = np.random.randint(xN - 1) + 1
-                yN_i = np.random.randint(yN - 1) + 1
-                zN_i = np.random.randint(zN - 1) + 1
-                if [xN_i, yN_i, zN_i] not in check_array:
-                    check_array.append([xN_i, yN_i, zN_i])
-                    empty_space = True
-
-        quadStartPos[0, iQuad] = xDim[0] + resolution*xN_i
-        quadStartPos[1, iQuad] = yDim[0] + resolution*yN_i
-        quadStartPos[2, iQuad] = zDim[0] + resolution*zN_i
+            possiblePositioning = False
+            while not possiblePositioning:
+                #xN_i = np.random.randint(xN - 1) + 1
+                #yN_i = np.random.randint(yN - 1) + 1
+                #zN_i = np.random.randint(zN - 1) + 1
+                posx = xDim[0] + 0.31 + (xL - 0.31)* np.random.rand()
+                posy = yDim[0] + 0.31 + (yL - 0.31)* np.random.rand()
+                posz = zDim[0] + 0.31 + (zL - 0.31)* np.random.rand()
+                distances = np.linalg.norm(quadStartPos[0:3, 0:iQuad] - np.array([[posx, posy, posz]]).T, axis=0)
+                if np.all(distances > 0.6):
+                    quadStartPos[0, iQuad] = posx
+                    quadStartPos[1, iQuad] = posy
+                    quadStartPos[2, iQuad] = posz
+                    possiblePositioning = True
         #quadStartPos[2, iQuad] = 2.0
 
     xidx_rand = np.random.permutation(xN)+1
@@ -77,19 +82,25 @@ def scn_random(nQuad, xDim, yDim, zDim):
             xN_i = xidx_rand[iQuad]
             yN_i = yidx_rand[iQuad]
             zN_i = np.random.randint(zN - 1) + 1
+            quadEndPos[0, iQuad] = xDim[0] + resolution * xN_i
+            quadEndPos[1, iQuad] = yDim[0] + resolution * yN_i
+            quadEndPos[2, iQuad] = zDim[0] + resolution * zN_i
         else:
-            empty_space = False
-            while not empty_space:
-                xN_i = np.random.randint(xN - 1) + 1
-                yN_i = np.random.randint(yN - 1) + 1
-                zN_i = np.random.randint(zN - 1) + 1
-                if [xN_i, yN_i, zN_i] not in check_array:
-                    check_array.append([xN_i, yN_i, zN_i])
-                    empty_space = True
+            possiblePositioning = False
+            while not possiblePositioning:
+                #xN_i = np.random.randint(xN - 1) + 1
+                #yN_i = np.random.randint(yN - 1) + 1
+                #zN_i = np.random.randint(zN - 1) + 1
+                posx = xDim[0] + 0.31 + (xL - 0.31) * np.random.rand()
+                posy = yDim[0] + 0.31 + (yL - 0.31) * np.random.rand()
+                posz = zDim[0] + 0.31 + (zL - 0.31) * np.random.rand()
+                distances = np.linalg.norm(quadStartPos[0:3, 0:iQuad] - np.array([[posx, posy, posz]]).T, axis=0)
+                if np.all(distances > 0.6):
+                    quadStartPos[0, iQuad] = posx
+                    quadStartPos[1, iQuad] = posy
+                    quadStartPos[2, iQuad] = posz
+                    possiblePositioning = True
 
-        quadEndPos[0, iQuad] = xDim[0] + resolution*xN_i
-        quadEndPos[1, iQuad] = yDim[0] + resolution*yN_i
-        quadEndPos[2, iQuad] = zDim[0] + resolution*zN_i
         # quadEndPos[2, iQuad] = 2.0
 
     return quadStartPos, quadStartVel, quadEndPos
