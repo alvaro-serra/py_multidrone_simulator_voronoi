@@ -27,13 +27,13 @@ model.nObs          =   model.nDynObs + (model.nQuad - 1);
                                     % number of other agents (including 
                                     % moving obstacles and other mavs) 
                                     % as obstalces
-model.nParamPerObs  =   8   ;       % number of parameters each other agent
-                                    % 3 + 3 + 2
+model.nParamPerObs  =   12   ;       % number of parameters each other agent
+                                    % 3 + 3 + 2 +1 + 3  % CHANGED
 model.N             =   20  ;       % horizon length
 model.dt            =   0.05;       % time step
 model.nvar          =   15  ;       % number of stage variables (z)
 model.neq           =   9   ;       % number of equality constraints (x)
-model.nh            =   3 + model.nObs; % number of inequality constraints
+model.nh            =   3 + model.nObs*2; % number of inequality constraints
 model.nin           =   4   ;       % number of control inputs (u)
 model.nslack        =   2   ;       % number of slacks (s)
 model.npar          =   18 + model.nObs*model.nParamPerObs;
@@ -70,4 +70,6 @@ if model.nObs >= 1                  % parameter for obstalce
     index.p.obs.pos     =   1:3 ;       % [x1, y1, z1]
     index.p.obs.size    =   4:6 ;       % [a1, b1, c1]
     index.p.obs.coll    =   7:8 ;       % sigmoid [lambda1, buffer1]
+    index.p.obs.comm    =   9:9 ;       % Voronoi cells vs communication. %CHANGED
+    index.p.obs.startPos =   10:12;      % [x1_0, y1_0, z1_0] %CHANGED
 end

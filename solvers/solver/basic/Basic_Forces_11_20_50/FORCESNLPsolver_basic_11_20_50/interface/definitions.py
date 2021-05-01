@@ -11,7 +11,7 @@ c_header = "include/FORCESNLPsolver_basic_11_20_50.h"
 params = \
 [("xinit"               , "dense" , ""               , ctypes.c_double, numpy.float64, (  9,   1),    9),
  ("x0"                  , "dense" , ""               , ctypes.c_double, numpy.float64, (300,   1),  300),
- ("all_parameters"      , "dense" , ""               , ctypes.c_double, numpy.float64, (2120,   1), 2120)]
+ ("all_parameters"      , "dense" , ""               , ctypes.c_double, numpy.float64, (3000,   1), 3000)]
 
 # Output                | Type    | Scalar type      | Ctypes type    | Numpy type   | Shape     | Len
 outputs = \

@@ -36,14 +36,14 @@ def basic_setup(nQuad, nDynObs):
         "nDynObs": nDynObs,
         "nQuad": nQuad,
         "nObs": nDynObs + nQuad - 1,
-        "nParamPerObs": 8,
+        "nParamPerObs": 12, # 3 + 3 + 2 + 1 + 3  % CHANGED
         "N": 20,
         "dt": 0.05,
         "nvar": 15,
         "neq": 9
     }
 
-    model["nh"] = 3 + model["nObs"] # number of inequality constraints
+    model["nh"] = 3 + model["nObs"]*2 # number of inequality constraints
     model["nin"] = 4
     model["nslack"] = 2
     model["npar"] = 18 + model["nObs"]*model["nParamPerObs"]
@@ -86,7 +86,9 @@ def basic_setup(nQuad, nDynObs):
         index["p"]["obs"] = {
             "pos": list(range(0, 3)),
             "size": list(range(3, 6)),
-            "coll": list(range(6, 8))
+            "coll": list(range(6, 8)),
+            "comm": list(range(8, 9)),
+            "startPos": list(range(9,12))
         }
 
     return pr, model, index
@@ -290,18 +292,19 @@ def auto_garbage_collect(pct=80.0):
 
 if __name__ == '__main__':
 
-    nQuad = 24
+    nQuad = 4
     nDynObs = 0
     n_episodes = 1
     ray.init(local_mode=False, log_to_driver=False)
     System = createMultiDroneSystem(nQuad=nQuad, nDynObs=nDynObs)
     # (i, j) --> robot i requests from robot j its traj. intention
-    n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-    #n_action = np.zeros((nQuad,nQuad))
-    scenario = -2
+    n_action_template = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+    #n_action_template = np.zeros((nQuad,nQuad))
+    n_action = n_action_template.copy()
+    scenario = -1
     n_action[0,0] = scenario
     sent_action = n_action.flatten()
-    n_timesteps = 100
+    n_timesteps = 900
 
     collisions = 0
     aux2 = time.time()
@@ -313,9 +316,9 @@ if __name__ == '__main__':
         print("step:",i)
         aux1 = time.time()
         obs = System.stepMultiAgent(sent_action)
-        n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
-        #n_action = np.zeros((nQuad, nQuad))
-        n_action[1, 1] = -1
+        #n_action = np.ones((nQuad,nQuad)) - np.eye(nQuad)
+        n_action = n_action_template.copy()
+        n_action[1, 1] = 0#-1
 
         if i%n_timesteps == n_timesteps-1:
             n_action[0, 0] = scenario
@@ -329,6 +332,7 @@ if __name__ == '__main__':
 
 
         # collision check
+        dones = np.zeros(nQuad)
         for iQuad1 in range(nQuad):
             for iQuad2 in range(nQuad):
                 if iQuad1 == iQuad2:
@@ -338,8 +342,12 @@ if __name__ == '__main__':
                     collision_bool = 1
                     collisions += 0.5
             print("distance to goal:", dist2goal(mat_info_array, iQuad1))
+            if dist2goal(mat_info_array, iQuad1) < 0.3:
+                dones[iQuad1] = 1
         print("step time:", time.time() - aux1)
         print("memory being used:", psutil.virtual_memory().percent)
+        if np.all(dones):
+            break
         #auto_garbage_collect(35.0)
 
     print("collisions:",collisions)

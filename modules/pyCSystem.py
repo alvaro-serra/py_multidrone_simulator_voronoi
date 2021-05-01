@@ -10,6 +10,7 @@ from utils.utils import predictQuadPathFromCom, predictStateConstantV
 import ray
 import time
 
+from solvers.solver.basic.Basic_Forces_3_20_50.FORCESNLPsolver_basic_3_20_50_py import FORCESNLPsolver_basic_3_20_50_solve as solver04
 from solvers.solver.basic.Basic_Forces_5_20_50.FORCESNLPsolver_basic_5_20_50_py import FORCESNLPsolver_basic_5_20_50_solve as solver06
 from solvers.solver.basic.Basic_Forces_11_20_50.FORCESNLPsolver_basic_11_20_50_py import FORCESNLPsolver_basic_11_20_50_solve as solver
 from solvers.solver.basic.Basic_Forces_17_20_50.FORCESNLPsolver_basic_17_20_50_py import FORCESNLPsolver_basic_17_20_50_solve as solver18
@@ -19,7 +20,7 @@ from solvers.solver.basic.Basic_Forces_23_20_50.FORCESNLPsolver_basic_23_20_50_p
 #"""
 def solveMPC(all_parameters, xinit, x0, nQuad = 12): #Might be some issues with the shape of the vectors
     # call the NLP solver
-    assert nQuad == 12 or nQuad == 24 or nQuad == 6 or nQuad == 18
+    assert nQuad == 12 or nQuad == 24 or nQuad == 6 or nQuad == 18 or nQuad == 4
     #aux1 = time.time()
     problem = {}
     problem['all_parameters'] = all_parameters
@@ -33,12 +34,14 @@ def solveMPC(all_parameters, xinit, x0, nQuad = 12): #Might be some issues with 
         OUTPUT, EXITFLAG, INFO = solver06(problem)
     elif nQuad == 18:
         OUTPUT, EXITFLAG, INFO = solver18(problem)
+    elif nQuad == 4:
+        OUTPUT, EXITFLAG, INFO = solver04(problem)
     #OUTPUT, EXITFLAG, INFO = FORCESNLPsolver_basic_11_20_50_py.FORCESNLPsolver_basic_11_20_50_solve(problem)
     #print("Solving time drone:",time.time()-aux1)
     return [OUTPUT.copy(), EXITFLAG, INFO]
 #"""
 #"""
-def setOnlineParameters(Quad):
+def setOnlineParameters(Quad, quadComm, multiQuadPos):
     # Set the real-time parameter vector
     # pAll include parameters for all N stage
 
@@ -76,6 +79,8 @@ def setOnlineParameters(Quad):
                 pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["pos"], idx]] = quadPath[:, iStage,iQuad:iQuad+1]
                 pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["size"], idx]] = quadSize
                 pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["coll"], idx]] = quadColl
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["comm"], idx]] = quadComm[iQuad]
+                pStage[Quad.index_["p"]["obsParam"][Quad.index_["p"]["obs"]["startPos"], idx]] = multiQuadPos[0:3,iQuad:iQuad+1]
                 idx = idx + 1
 
         for jObs in range(Quad.nDynObs_):
@@ -202,17 +207,17 @@ class pyCSystem():
         #aux1 = time.time()
 
         if parallelization == "none":
-            multiquad_mpc_pAll_ = [setOnlineParameters(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
+            multiquad_mpc_pAll_ = [setOnlineParameters(self.MultiQuad_[iQuad], self.multi_quad_comm_mtx_[iQuad,:], self.multi_quad_state_) for iQuad in range(self.nQuad_)]
 
         elif parallelization == "ray":
-            refs_setop = [setOnlineParameters_ray.remote(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_)]
+            refs_setop = [setOnlineParameters_ray.remote(self.MultiQuad_[iQuad], self.multi_quad_comm_mtx_[iQuad,:], self.multi_quad_state_) for iQuad in range(self.nQuad_)]
             multiquad_mpc_pAll_ = ray.get(refs_setop)
 
             # Quad_ids = [ray.put(Quad) for Quad in self.MultiQuad_]
             # refs_setop = [setOnlineParameters_ray.remote(Quad_id) for Quad_id in Quad_ids]
 
         elif parallelization == "joblib":
-            multiquad_mpc_pAll_ = Parallel(n_jobs=-1)(delayed(setOnlineParameters)(self.MultiQuad_[iQuad]) for iQuad in range(self.nQuad_))
+            multiquad_mpc_pAll_ = Parallel(n_jobs=-1)(delayed(setOnlineParameters)(self.MultiQuad_[iQuad], self.multi_quad_comm_mtx_[iQuad,:], self.multi_quad_state_) for iQuad in range(self.nQuad_))
 
 
         ###################

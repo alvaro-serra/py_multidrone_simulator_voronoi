@@ -10,11 +10,11 @@ clc
 
 
 %% Initialization
-nQuad   = 18;            % number of quadrotors
+nQuad   = 4;            % number of quadrotors
 nDynObs = 0;            % number of moving obstacles
 srv_idx = 2;            % idx of the service
 initialize_func;
 
 
 %% Generate solver
-mpc_generator_basic;
+mpc_generator_basicVoronoi;

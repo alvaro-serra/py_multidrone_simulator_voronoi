@@ -18,7 +18,7 @@ quad_ExpID = [1, 2, 3, 4, 5:100];
 % nDynObs = 0;            % number of moving obstacles
 % three global variables are defined: pr, model, index
 if strcmp(application, 'basic')
-    basic_setup;        % basic multi-mav collision avoidance, slack is used
+    basicVoronoi_setup;        % basic multi-mav collision avoidance, slack is used
 elseif strcmp(application, 'chance')
     chance_setup;       % chance constrained collision avoidance
 elseif strcmp(application, 'chance_slack')
